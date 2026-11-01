@@ -117,6 +117,14 @@ Confirmed
 
 ## Notes template
 
+### 2026-11-01 · Road-based fleet simulation
+
+The user wants fleet movement to follow actual mapped roads, with realistic changes between moving, idling and stopped states. Vehicles should be distributed across multiple routes with space between them, rather than concentrated on a single road. The prototype uses reusable OpenStreetMap/OSRM road loops and simulated telemetry; offline and inspection-held vehicles remain stationary.
+
+### 2026-11-01 · Map palette
+
+The user prefers a clean map with white land, light gray roads, yellow highways, and minimal competing land colors so fleet markers stand out.
+
 ### 2026-11-01 · Portfolio presentation
 
 Vayu is a design portfolio prototype. The user wants the interface to look and read like a finished product, without prominent notices that the prototype is not connected to live data.

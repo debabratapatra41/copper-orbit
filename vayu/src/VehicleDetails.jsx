@@ -1,7 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import LiveDashcam from './LiveDashcam';
+import VehicleRecords from './VehicleRecords';
+import { getNearbyRoadRoute, getRoadReplay } from './fleetSimulation';
 import { CircleMarker, Polyline, Tooltip, useMap } from 'react-leaflet';
 import {
   Activity,
+  Battery,
+  Fuel,
+  Map as MapIcon,
+  MapPin,
+  UserRound,
+  UsersRound,
+  Video,
+  Wrench,
   AlertTriangle,
   Calendar,
   ChevronDown,
@@ -66,23 +77,14 @@ export function PlaybackMap({ vehicle, progress, active, setProgress, setPlaybac
   const map = useMap();
   const telemetry = useMemo(() => {
     return vehicle ? getTripTelemetry(vehicle.id) : null;
-  }, [vehicle]);
+  }, [vehicle?.id]);
 
   const [hoveredState, setHoveredState] = useState(null);
   const [studioProgress, setStudioProgress] = useState(null);
   const hoverLeaveTimerRef = useRef(null);
 
-  const points = useMemo(() => {
-    if (!vehicle) return [];
-    const [lat, lng] = vehicle.position;
-    return [
-      [lat - 0.025, lng - 0.035],
-      [lat - 0.02, lng - 0.018],
-      [lat - 0.012, lng - 0.012],
-      [lat - 0.008, lng + 0.005],
-      [lat, lng]
-    ];
-  }, [vehicle]);
+  // Freeze the road section when this vehicle is selected, so live updates do not move the replay.
+  const points = useMemo(() => getRoadReplay(vehicle), [vehicle?.id]);
 
   // Fit the whole route into the unobstructed visible viewport (avoiding drawer)
   useEffect(() => {
@@ -180,7 +182,6 @@ export function PlaybackMap({ vehicle, progress, active, setProgress, setPlaybac
     const { pct } = projectLatLngToRoute(points, e.latlng);
     if (setProgress) setProgress(pct);
     if (setPlayback) setPlayback(true);
-    setHoveredState(curr => (curr ? { ...curr, isPinned: true } : null));
   }, [points, setProgress, setPlayback]);
 
   const handleMilestoneHover = useCallback((mPct, mCoord) => {
@@ -200,10 +201,10 @@ export function PlaybackMap({ vehicle, progress, active, setProgress, setPlaybac
   const handleMilestoneClick = useCallback((mPct) => {
     if (setProgress) setProgress(mPct);
     if (setPlayback) setPlayback(true);
-    setHoveredState(curr => (curr ? { ...curr, isPinned: true } : null));
   }, [setProgress, setPlayback]);
 
-  if (!active || !points.length || !point) return null;
+  if (!active) return null;
+  if (!points.length || !point) return <div className="road-route-status" role="status">Road route unavailable for this vehicle.</div>;
 
   const currentPt = telemetry?.points[progress] || null;
   const isAlertIncident = currentPt?.event && (currentPt.event.severity === 'alert' || currentPt.event.severity === 'warning');
@@ -318,6 +319,7 @@ export function PlaybackMap({ vehicle, progress, active, setProgress, setPlaybac
         <>
           {/* Snap Halo */}
           <CircleMarker
+            interactive={false}
             center={hoveredState.snapLatLng}
             radius={15}
             pathOptions={{
@@ -329,6 +331,7 @@ export function PlaybackMap({ vehicle, progress, active, setProgress, setPlaybac
           />
           {/* Snap Center Dot with Attached Dashcam Hover Card */}
           <CircleMarker
+            interactive={false}
             center={hoveredState.snapLatLng}
             radius={6}
             pathOptions={{
@@ -458,9 +461,37 @@ function formatDayLabel(dateKey) {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function VehicleDetails({ vehicle, onClose, onLocate, playback, setPlayback, progress, setProgress }) {
+export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNearbyVehicle, onNearbyRoute, onNearbyHover, onNearbyDestination, closing, onClose, onLocate, playback, setPlayback, progress, setProgress, demoCredits, setDemoCredits }) {
   const [tab, setTab] = useState('overview');
+  const [mediaOpen, setMediaOpen] = useState(false);
+  const [nearbyRadius, setNearbyRadius] = useState(5);
+  const [nearbySelection, setNearbySelection] = useState(null);
+  const detailsContentRef = useRef(null);
+  const nearbyScrollRef = useRef(0);
+  useEffect(() => { if (tab !== 'nearby') { setNearbySelection(null); onNearbyRoute(null); onNearbyHover(null); onNearbyDestination(null); } }, [tab, onNearbyRoute, onNearbyHover, onNearbyDestination]);
+  const chooseNearby = target => {
+    nearbyScrollRef.current = detailsContentRef.current?.scrollTop || 0;
+    if (detailsContentRef.current) detailsContentRef.current.scrollTop = 0;
+    onNearbyHover(null);
+    const origin = fleetVehicles.find(item => item.id === vehicle.id) || vehicle;
+    const route = getNearbyRoadRoute(origin, target);
+    setNearbySelection({ target, route });
+    onNearbyDestination(target);
+    onNearbyRoute(route);
+  };
+  const nearbyVehicles = useMemo(() => {
+    const origin = fleetVehicles.find(item => item.id === vehicle.id)?.position || vehicle.position;
+    if (!origin) return [];
+    const rad = value => value * Math.PI / 180;
+    return fleetVehicles.filter(item => item.id !== vehicle.id && item.position).map(item => {
+      const dLat = rad(item.position[0] - origin[0]);
+      const dLon = rad(item.position[1] - origin[1]);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(origin[0])) * Math.cos(rad(item.position[0])) * Math.sin(dLon / 2) ** 2;
+      return { vehicle: item, distance: 12742 * Math.asin(Math.min(1, Math.sqrt(a))) };
+    }).filter(item => item.distance <= nearbyRadius).sort((a, b) => a.distance - b.distance);
+  }, [fleetVehicles, vehicle.id, nearbyRadius]);
   const [view, setView] = useState('timeline');
+  const [timelineFilter, setTimelineFilter] = useState('all');
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
 
@@ -484,6 +515,7 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
 
   useEffect(() => {
     setTab('overview');
+    setTimelineFilter('all');
     setPlaying(false);
     setProgress(0);
     setPlayback(false);
@@ -530,6 +562,11 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
     setProgress(0);
     setPlayback(true);
     setPlaying(false);
+  };
+
+  const openHistory = () => {
+    if (tab !== 'history') openPlayback();
+    setTab('history');
   };
 
   const seconds = 9 * 3600 + 52 * 60 + 30 + Math.round(progress * 30);
@@ -856,13 +893,12 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
   const monthLabel = displayMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
   return (
-    <aside className="vehicle-details" aria-label={`Vehicle details for ${vehicle.id}`}>
+    <aside className={`vehicle-details ${closing ? 'is-closing' : ''}`} aria-hidden={closing || undefined} inert={closing || undefined} aria-label={`Vehicle details for ${vehicle.id}`}>
       {/* Header */}
       <div className="details-header">
         <div>
-          <small>VEHICLE DETAILS</small>
-          <h2>{vehicle.id}</h2>
-          <p>{vehicle.name} · <span className={`co-status co-status--${vehicle.status}`}>{offline ? 'tracker offline' : vehicle.status}</span></p>
+          <div className="details-identity-line"><h2>{vehicle.id}</h2><span className={`co-status co-status--${vehicle.status}`}>{offline ? 'tracker offline' : vehicle.status}</span></div>
+          <p>{vehicle.name}</p>
         </div>
         <button className="co-icon-button" aria-label="Close vehicle details" onClick={onClose}><X size={18}/></button>
       </div>
@@ -885,10 +921,13 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
             role="tab"
             aria-selected={tab === 'history'}
             className={`segmented-tab ${tab === 'history' ? 'active' : ''}`}
-            onClick={() => setTab('history')}
+            onClick={openHistory}
           >
             <History size={14} strokeWidth={2} />
             <span>History</span>
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'nearby'} className={`segmented-tab ${tab === 'nearby' ? 'active' : ''}`} onClick={() => { setTab('nearby'); setPlayback(false); setPlaying(false); }}>
+            <UsersRound size={14} strokeWidth={2} /><span>Nearby vehicles</span>
           </button>
         </div>
       </div>
@@ -1148,27 +1187,21 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
         </div>
       )}
 
+      {tab === 'history' && view === 'timeline' && <div className="history-filters" role="group" aria-label="Filter timeline events">{[['all', 'All'], ['trip', 'Trip'], ['stops', 'Stops'], ['alerts', 'Alerts']].map(([key, label]) => <button type="button" key={key} aria-pressed={timelineFilter === key} onClick={() => setTimelineFilter(key)}>{label}</button>)}</div>}
+
       {/* Scrollable content area */}
-      <div className="details-content">
+      <div className="details-content" ref={detailsContentRef}>
         {tab === 'overview' ? (
           <>
-            <div className="detail-section">
-              <h3>Current status</h3>
-              <div className="detail-grid">
-                <span>{offline ? 'Last known speed' : 'Speed'} <b>{vehicle.speed}</b></span>
-                <span>{offline ? 'Last known energy' : /\bEV\b/i.test(vehicle.name) ? 'Battery' : 'Fuel'} <b>{vehicle.fuel}</b></span>
-                <span>{offline ? 'Last known location' : 'Location'} <b>{vehicle.location}</b></span>
-                <span>Last update <b>{vehicle.updated}</b></span>
+            <section className="live-summary" aria-label="Current vehicle status">
+              <div className="live-summary-heading"><h3>Current status</h3><div className="live-summary-actions"><button type="button" className="co-icon-button" aria-label="Show on map" title="Show on map" onClick={() => onLocate(vehicle)}><MapIcon size={16} /></button><button type="button" className="co-icon-button" aria-label="View history" title="View history" onClick={openHistory}><History size={16} /></button></div></div>
+              <div className="live-summary-grid">
+                <div className="live-summary-item"><Gauge size={16} aria-hidden="true" /><span><small>{offline ? 'Last known speed' : 'Speed'}</small><b>{vehicle.speed}</b></span></div>
+                <div className="live-summary-item">{/\bEV\b/i.test(vehicle.name) ? <Battery size={16} aria-hidden="true" /> : <Fuel size={16} aria-hidden="true" />}<span><small>{offline ? 'Last known energy' : /\bEV\b/i.test(vehicle.name) ? 'Battery' : 'Fuel'}</small><b>{vehicle.fuel}</b></span></div>
+                <div className="live-summary-item"><MapPin size={16} aria-hidden="true" /><span><small>{offline ? 'Last known location' : 'Location'}</small><b title={vehicle.location}>{vehicle.location}</b></span></div>
+                <div className="live-summary-item"><Clock size={16} aria-hidden="true" /><span><small>Last update</small><b>{vehicle.updated}</b></span></div>
               </div>
-            </div>
-            <div className="detail-section">
-              <h3>{offline ? 'Last assigned' : vehicle.status === 'idle' ? 'Last driven by' : 'Driver'}</h3>
-              <p>{vehicle.driver}</p>
-            </div>
-            <div className="detail-actions">
-              <button className="co-button" onClick={() => onLocate(vehicle)}>Show on map</button>
-              <button className="co-button" onClick={() => setTab('history')}>View history</button>
-            </div>
+            </section>
             {vehicle.sampleContext && (
               <div className="detail-section">
                 <h3>{vehicle.sampleContext.title ? 'Exception' : 'Trip'}</h3>
@@ -1177,11 +1210,37 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
                 <p>Live dispatch, diagnostic and tracker data is not connected.</p>
               </div>
             )}
-            <div className="detail-section">
-              <h3>Maintenance & documents</h3>
-              <p>Live maintenance and document data is not connected.</p>
-            </div>
+            <details className="driver-details details-accordion">
+              <summary className="accordion-heading"><span className="driver-details-icon"><UserRound size={16} aria-hidden="true" /></span><span className="accordion-title"><b>Driver details</b><small>{vehicle.driver || 'Driver unavailable'} · {offline ? 'Last assigned' : vehicle.status === 'idle' || vehicle.status === 'stopped' ? 'Last driven by' : 'Assigned driver'}</small></span><ChevronDown size={16} className="accordion-chevron" /></summary>
+              <div className="driver-details-grid">
+                <div><span>Full name</span><b>{vehicle.driver || 'Not available'}</b></div>
+                <div><span>Driver ID</span><b>{vehicle.driverId || 'Not available'}</b></div>
+                <div className="driver-details-full"><span>Address</span><b>{vehicle.driverAddress || 'Not available'}</b></div>
+                <div><span>Phone number</span><b>{vehicle.driverPhone || 'Not available'}</b></div>
+                <div><span>Email address</span><b>{vehicle.driverEmail || 'Not available'}</b></div>
+              </div>
+              <div className="driver-details-scores" aria-label="Driver scores"><div><span>Driving score</span><b>{vehicle.driverScore ?? (75 + (Number(vehicle.id.slice(3)) % 25))}<small> / 100</small></b></div><div><span>Fuel score</span><b>{vehicle.fuelScore ?? (70 + (Number(vehicle.id.slice(3)) * 7 % 30))}<small> / 100</small></b></div></div>
+            </details>
+            <details className="details-accordion" onToggle={event => setMediaOpen(event.currentTarget.open)}>
+              <summary className="accordion-heading"><span className="driver-details-icon"><Video size={16} aria-hidden="true" /></span><span className="accordion-title"><b>Media</b><small>Dashcam video and snapshots</small></span><ChevronDown size={16} className="accordion-chevron" /></summary>
+              {mediaOpen && <LiveDashcam credits={demoCredits} setCredits={setDemoCredits} />}
+            </details>
+            <details className="details-accordion">
+              <summary className="accordion-heading"><span className="driver-details-icon"><Wrench size={16} aria-hidden="true" /></span><span className="accordion-title"><b>Maintenance & inspections</b><small>Service documents and DVIRs</small></span><ChevronDown size={16} className="accordion-chevron" /></summary>
+              <VehicleRecords vehicle={vehicle} hideHeading />
+            </details>
           </>
+        ) : tab === 'nearby' ? (
+          <section className="nearby-section" aria-label={nearbySelection ? 'Directions to nearby vehicle' : 'Nearby vehicles'}>
+            {nearbySelection ? <>
+              <button type="button" className="nearby-back" onClick={() => { setNearbySelection(null); onNearbyRoute(null); onNearbyDestination(null); onNearbyHover(null); requestAnimationFrame(() => { if (detailsContentRef.current) detailsContentRef.current.scrollTop = nearbyScrollRef.current; }); }}><ChevronLeft size={16} />Nearby vehicles</button>
+              <div className="nearby-directions"><div className="nearby-directions-heading"><div><b>Directions</b><span>{vehicle.id} → {nearbySelection.target.id}</span></div></div><div className="nearby-route-summary">{nearbySelection.route ? `${(nearbySelection.route.metres / 1000).toFixed(1)} km along available road geometry` : 'Road route unavailable'}</div>{nearbySelection.route ? <><p>Directions follow the available road geometry. Road restrictions are not available.</p><ol>{nearbySelection.route.steps.map((step, index) => <li key={index}><span>{index + 1}</span><div><b>{step.text}</b><small>{step.metres < 1000 ? `${Math.round(step.metres)} m` : `${(step.metres / 1000).toFixed(1)} km`} from start</small></div></li>)}</ol></> : <p>A suitable route is not available in the current road data.</p>}</div>
+            </> : <>
+              <div className="nearby-header"><div><h3>Nearby vehicles</h3><p>Distance from {vehicle.id}</p></div><label>Radius<select aria-label="Nearby vehicle radius" value={nearbyRadius} onChange={event => setNearbyRadius(Number(event.target.value))}>{[1, 2, 5, 10, 25, 50].map(radius => <option key={radius} value={radius}>{radius} km</option>)}</select></label></div>
+              <p className="nearby-count" aria-live="polite">{nearbyVehicles.length} {nearbyVehicles.length === 1 ? 'vehicle' : 'vehicles'} within {nearbyRadius} km · Straight-line distance</p>
+              {nearbyVehicles.length ? <div className="fleet-list compact nearby-list">{nearbyVehicles.map(item => <div className="nearby-entry" key={item.vehicle.id} onMouseEnter={() => onNearbyHover(item.vehicle)} onMouseLeave={() => onNearbyHover(null)} onFocus={() => onNearbyHover(item.vehicle)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) onNearbyHover(null); }}>{renderNearbyVehicle(item.vehicle, `${item.distance < 1 ? `${Math.round(item.distance * 1000)} m` : `${item.distance.toFixed(1)} km`} away${item.vehicle.sampleContext?.kind === 'offline' ? ' · Last known' : ''}`, () => chooseNearby(item.vehicle))}</div>)}</div> : <div className="nearby-empty">No vehicles within {nearbyRadius} km. Try a larger radius.</div>}
+            </>}
+          </section>
         ) : (
           <>
             {/* Iterating across the selected 1 or 2 days */}
@@ -1193,7 +1252,9 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
               const filteredEvents = dayEvents.filter(e => {
                 const matchesView = view !== 'events' || e.isIncident || e.at === 12 || e.at === 38 || e.at === 52 || e.at === 65 || e.at === 78;
                 const inTimeWindow = isAllDay || (e.time >= startTime && e.time <= endTime);
-                return matchesView && inTimeWindow;
+                const category = e.label === 'Stop' ? 'stops' : e.isIncident ? 'alerts' : 'trip';
+                const matchesFilter = view !== 'timeline' || timelineFilter === 'all' || timelineFilter === category;
+                return matchesView && inTimeWindow && matchesFilter;
               });
 
               return (
@@ -1225,14 +1286,8 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
                     </div>
                   ) : (
                     <div className="history-empty-window">
-                      <span>No events found between {startTime} and {endTime} IST</span>
-                      <button
-                        type="button"
-                        className="reset-time-link"
-                        onClick={() => setTimePreset('00:00', '23:59')}
-                      >
-                        Reset to All Day
-                      </button>
+                      <span>{view === 'timeline' && timelineFilter !== 'all' ? 'No matching activity for this filter and time range.' : `No events found between ${startTime} and ${endTime} IST`}</span>
+                      {view === 'timeline' && timelineFilter !== 'all' ? <button type="button" className="reset-time-link" onClick={() => setTimelineFilter('all')}>Show all activity</button> : !isAllDay && <button type="button" className="reset-time-link" onClick={() => setTimePreset('00:00', '23:59')}>Reset to All Day</button>}
                     </div>
                   )}
                 </div>
@@ -1248,7 +1303,7 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
           <div className="playback-header-row">
             <div className="playback-title-meta">
               <h3>Trip playback</h3>
-              <p className="playback-subtitle">Route based on demonstration data</p>
+              <p className="playback-subtitle">Road-based route</p>
             </div>
             <div className="playback-header-actions">
               <button
