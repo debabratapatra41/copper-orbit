@@ -132,7 +132,7 @@ export function getTripTelemetry(vehicleId) {
       gForce = 0.02;
       latG = 0.01;
       longG = 0.01;
-      event = { type: 'start', label: 'Trip started', badge: 'Ignition ON', icon: '🏁', severity: 'info' };
+      event = { type: 'start', label: 'Trip started', badge: 'Ignition on', severity: 'info' };
     } else if (p <= 6) {
       speed = Math.round((p / 6) * 36);
       accel = Number((1.8 - (p / 6) * 0.6).toFixed(1));
@@ -146,7 +146,7 @@ export function getTripTelemetry(vehicleId) {
         gForce = 0.32;
         longG = 0.29;
         latG = 0.08;
-        event = { type: 'accel', label: 'Harsh Accel', badge: '+2.8 m/s²', icon: '🚀', severity: 'warning' };
+        event = { type: 'accel', label: 'Harsh acceleration', badge: '+2.8 m/s²', severity: 'warning' };
       } else {
         const t = (p - 6) / 10;
         speed = Math.round(36 + t * 10);
@@ -175,7 +175,7 @@ export function getTripTelemetry(vehicleId) {
       longG = 0.0;
       latG = 0.0;
       if (p === 38) {
-        event = { type: 'stop', label: 'Stop', badge: '4 min', icon: '🛑', severity: 'info' };
+        event = { type: 'stop', label: 'Stop', badge: '4 min', severity: 'info' };
       }
     } else if (p <= 54) {
       const t = (p - 42) / 12;
@@ -185,7 +185,7 @@ export function getTripTelemetry(vehicleId) {
         gForce = 0.22;
         longG = 0.06;
         latG = 0.18;
-        event = { type: 'speed', label: 'Speeding', badge: '58 km/h', icon: '⚠️', severity: 'alert' };
+        event = { type: 'speed', label: 'Speed limit exceeded', badge: '58 km/h', severity: 'alert' };
       } else {
         speed = Math.round(t * 54);
         accel = Number((1.6 - t * 0.9).toFixed(1));
@@ -200,7 +200,7 @@ export function getTripTelemetry(vehicleId) {
         gForce = 0.42;
         latG = 0.39;
         longG = -0.04;
-        event = { type: 'gforce', label: 'Harsh Turn', badge: '0.42 g', icon: '⚡', severity: 'alert' };
+        event = { type: 'gforce', label: 'Harsh turn', badge: '0.42 g', severity: 'alert' };
       } else {
         const t = (p - 54) / 12;
         speed = Math.round(54 - t * 30);
@@ -223,7 +223,7 @@ export function getTripTelemetry(vehicleId) {
         gForce = 0.38;
         longG = -0.37;
         latG = 0.08;
-        event = { type: 'accel', label: 'Harsh Brake', badge: '-3.6 m/s²', icon: '🚨', severity: 'alert' };
+        event = { type: 'accel', label: 'Harsh braking', badge: '-3.6 m/s²', severity: 'alert' };
       } else if (p === 79) {
         speed = 18;
         accel = -2.2;
@@ -252,7 +252,7 @@ export function getTripTelemetry(vehicleId) {
       longG = Number((accel / 9.81).toFixed(2));
       latG = 0.01;
       if (p === 100) {
-        event = { type: 'end', label: 'Trip ended', badge: 'Destination Hub', icon: '🏁', severity: 'info' };
+        event = { type: 'end', label: 'Trip ended', badge: 'Destination reached', severity: 'info' };
       }
     }
 
