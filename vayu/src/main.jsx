@@ -5,13 +5,20 @@ import L from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-import { MapContainer, TileLayer, Circle, CircleMarker, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, Circle, CircleMarker, Tooltip, useMap } from 'react-leaflet';
+import { maplibreGL } from '@maplibre/maplibre-gl-leaflet';
+import { setWorkerUrl } from 'maplibre-gl';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import mapStyle from './vayu-map-style.json';
 import { ArrowUpRight, Battery, Bell, Bookmark, Check, ChevronDown, ChevronsUp, Clock3, Download, Filter, Fuel, Gauge, ListChevronsDownUp, ListChevronsUpDown, LocateFixed, Map as MapIcon, MapPin, Minus, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Route, Satellite, Signal, Search, TriangleAlert, Truck } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import '../../design-system.css';
 import './styles.css';
 import VehicleDetails, { PlaybackMap } from './VehicleDetails';
 import VehicleSparkline from './VehicleSparkline';
+
+setWorkerUrl(workerUrl);
 
 const seedVehicles = [
   { id: 'VY-2048', name: 'Tata Ace EV', driver: 'Rahul Mehta', status: 'moving', speed: '42 km/h', location: 'Outer Ring Road', updated: 'Now', fuel: '78%', trip: '18.4 km', position: [12.982, 77.603] },
@@ -136,9 +143,61 @@ function VehicleRow({ vehicle, selected, onSelect, onLocate, compact }) {
   </div>;
 }
 
-function LocateVehicle({ target }) {
+function centerInVisibleViewport(map, position, zoom = 16, animate = true, hasDetail = false) {
+  if (!map || typeof map.getSize !== 'function' || !position) return;
+  const mapSize = map.getSize();
+  if (!mapSize || mapSize.x <= 0 || mapSize.y <= 0) return;
+
+  const drawerEl = typeof document !== 'undefined' ? document.querySelector('.vehicle-details') : null;
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 760;
+
+  let dx = 0;
+  let dy = 0;
+
+  if (drawerEl) {
+    if (isMobile) {
+      const drawerHeight = drawerEl.offsetHeight || 340;
+      dy = Math.round(drawerHeight / 2);
+    } else {
+      const drawerWidth = drawerEl.offsetWidth || 440;
+      dx = Math.round((drawerWidth + 12) / 2);
+    }
+  } else if (hasDetail) {
+    if (isMobile) {
+      dy = 170;
+    } else {
+      dx = Math.round((440 + 12) / 2);
+    }
+  }
+
+  const targetZoom = zoom || map.getZoom() || 16;
+  const pointPixel = map.project(position, targetZoom);
+  const centerPixel = pointPixel.add([dx, dy]);
+  const centerLatLng = map.unproject(centerPixel, targetZoom);
+
+  map.stop();
+  map.setView(centerLatLng, targetZoom, { animate });
+}
+
+function LocateVehicle({ target, detailVehicle, playback }) {
   const map = useMap();
-  useEffect(() => { if (target) { map.stop(); map.setView(target.position, 16, { animate: false }); } }, [map, target]);
+
+  useEffect(() => {
+    if (!target || playback) return;
+    const run = () => centerInVisibleViewport(map, target.position, 16, true, Boolean(detailVehicle));
+    run();
+    const timer = setTimeout(run, 120);
+    return () => clearTimeout(timer);
+  }, [map, target, playback, detailVehicle]);
+
+  useEffect(() => {
+    if (!detailVehicle || playback) return;
+    const run = () => centerInVisibleViewport(map, detailVehicle.position, 16, true, true);
+    run();
+    const timer = setTimeout(run, 120);
+    return () => clearTimeout(timer);
+  }, [map, detailVehicle?.id, playback]);
+
   return null;
 }
 
@@ -166,8 +225,25 @@ function MapResizeObserver() {
   return null;
 }
 
+function VayuBasemap() {
+  const map = useMap();
+  useEffect(() => {
+    const attribution = '© <a href="https://openfreemap.org">OpenFreeMap</a> © <a href="https://openmaptiles.org/">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>';
+    let layer;
+    try {
+      layer = maplibreGL({ style: mapStyle, attributionControl: { customAttribution: attribution } });
+      layer.addTo(map);
+    } catch (error) {
+      console.warn('Vector map unavailable, using the standard OpenStreetMap layer.', error);
+      layer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>' }).addTo(map);
+    }
+    return () => { if (layer && map.hasLayer(layer)) map.removeLayer(layer); };
+  }, [map]);
+  return null;
+}
+
 function FleetMap({ visibleVehicles, selectedId, onSelect, locateTarget, detailVehicle, playback, progress }) {
-  return <div className="map-panel"><div className="map-canvas"><MapContainer center={[20, 0]} zoom={2} minZoom={2} maxZoom={17} zoomControl={false} attributionControl scrollWheelZoom><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" /><MapResizeObserver /><ClusteredVehicles vehicles={visibleVehicles} onSelect={onSelect} /><PlaybackMap vehicle={detailVehicle} active={playback} progress={progress} /><LocateVehicle target={locateTarget} /><MapControls /></MapContainer></div></div>;
+  return <div className="map-panel"><div className="map-canvas"><MapContainer center={[20, 0]} zoom={2} minZoom={2} maxZoom={17} zoomControl={false} attributionControl scrollWheelZoom><VayuBasemap /><MapResizeObserver /><ClusteredVehicles vehicles={visibleVehicles} onSelect={onSelect} /><PlaybackMap vehicle={detailVehicle} active={playback} progress={progress} /><LocateVehicle target={locateTarget} detailVehicle={detailVehicle} playback={playback} /><MapControls /></MapContainer></div></div>;
 }
 
 function LocationFilter({ location, onChange }) {
@@ -202,14 +278,21 @@ function FleetWorkspace({ onNotice }) {
   const [detailId, setDetailId] = useState(null);
   const [playback, setPlayback] = useState(false);
   const [progress, setProgress] = useState(0);
-  const openVehicle = useCallback(id => { setSelectedId(id); setDetailId(id); }, []);
+  const openVehicle = useCallback(id => {
+    setSelectedId(id);
+    setDetailId(id);
+    const v = vehicles.find(vehicle => vehicle.id === id);
+    if (v) {
+      setLocateTarget({ ...v, _ts: Date.now() });
+    }
+  }, []);
   const detailVehicle = vehicles.find(vehicle => vehicle.id === detailId);
   const filtered = useMemo(() => vehicles.filter(vehicle => {
     const matchesFilter = filter === 'all' || vehicle.status === filter;
     const matchesQuery = [vehicle.id, vehicle.name, vehicle.driver, vehicle.location].join(' ').toLowerCase().includes(query.toLowerCase());
     return matchesFilter && matchesQuery && (location === 'all' || vehicle.location === location);
   }), [filter, query, location]);
-  return <section className={`fleet-workspace ${resizing ? "is-resizing" : ""} ${panelCollapsed ? "is-panel-collapsed" : ""}`} style={{"--fleet-panel-width": `${panelWidth}vw`}}><aside id="fleet-panel" className="fleet-panel" aria-label="Fleet vehicles" hidden={panelCollapsed}><div className="fleet-search-row"><button className="icon-button subtle" aria-label="Filter options" aria-expanded={filtersOpen} aria-controls="fleet-filters" onClick={() => setFiltersOpen(!filtersOpen)}><Filter size={15} /></button><button className="icon-button subtle view-toggle" aria-label={compactView ? "Switch to full view" : "Switch to compact view"} title={compactView ? "Switch to full view" : "Switch to compact view"} aria-pressed={compactView} onClick={() => setCompactView(view => !view)}>{compactView ? <ListChevronsUpDown size={16} /> : <ListChevronsDownUp size={16} />}</button><label className="search-field"><span className="sr-only">Search fleet</span><Search size={15} /><input value={query} onChange={event => setQuery(event.target.value)} type="search" placeholder="Search vehicle, driver or location" /><kbd>⌘ K</kbd></label></div><div id="fleet-filters" className="fleet-filter-panel" hidden={!filtersOpen}><div className="filter-panel-heading"><b>Filters</b><button onClick={() => { setLocation('all'); setFilter('all'); }}>Clear all</button></div><LocationFilter location={location} onChange={setLocation} /><p>{filtered.length} matching vehicles</p></div><div className="status-filters" role="group" aria-label="Filter vehicles by status">{[['all','All'],['moving','Moving'],['idle','Idle'],['alert','Alerts']].map(([key,label]) => <button type="button" key={key} className={filter === key ? 'active' : ''} aria-pressed={filter === key} onClick={() => setFilter(key)}>{label}</button>)}</div><div className={`fleet-list ${compactView ? 'compact' : ''}`}>{filtered.slice(0, 100).map(vehicle => <VehicleRow key={vehicle.id} vehicle={vehicle} compact={compactView} selected={vehicle.id === selectedId} onSelect={openVehicle} onLocate={vehicle => { setSelectedId(vehicle.id); setLocateTarget({...vehicle}); }} />)}</div>{filtered.length === 0 && <div className="fleet-empty"><Search size={24} /><b>No vehicles found</b><p>Try a different search or status filter.</p></div>}</aside><button type="button" className="fleet-panel-toggle" aria-label={panelCollapsed ? "Expand fleet panel" : "Collapse fleet panel"} title={panelCollapsed ? "Expand fleet panel" : "Collapse fleet panel"} aria-controls="fleet-panel" aria-expanded={!panelCollapsed} onClick={() => setPanelCollapsed(value => !value)}>{panelCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button><div className="fleet-resizer" role="separator" tabIndex={0} aria-label="Resize fleet panel" aria-controls="fleet-panel" aria-orientation="vertical" aria-valuemin={20} aria-valuemax={60} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth}% of viewport width`} title="Drag to resize fleet panel" onPointerDown={event => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); event.currentTarget.focus(); setResizing(true); }} onPointerMove={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) resizeFromPointer(event); }} onPointerUp={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); setResizing(false); }} onLostPointerCapture={() => setResizing(false)} onKeyDown={handleResizeKey}><span aria-hidden="true" /></div><FleetMap visibleVehicles={filtered} selectedId={selectedId} onSelect={openVehicle} locateTarget={locateTarget} detailVehicle={detailVehicle} playback={playback} progress={progress} />{detailVehicle && <VehicleDetails key={detailVehicle.id} vehicle={detailVehicle} onClose={() => {setDetailId(null);setPlayback(false)}} onLocate={vehicle => setLocateTarget({...vehicle})} playback={playback} setPlayback={setPlayback} progress={progress} setProgress={setProgress} />}</section>;
+  return <section className={`fleet-workspace ${resizing ? "is-resizing" : ""} ${panelCollapsed ? "is-panel-collapsed" : ""}`} style={{"--fleet-panel-width": `${panelWidth}vw`}}><aside id="fleet-panel" className="fleet-panel" aria-label="Fleet vehicles" hidden={panelCollapsed}><div className="fleet-search-row"><button className="icon-button subtle" aria-label="Filter options" aria-expanded={filtersOpen} aria-controls="fleet-filters" onClick={() => setFiltersOpen(!filtersOpen)}><Filter size={15} /></button><button className="icon-button subtle view-toggle" aria-label={compactView ? "Switch to full view" : "Switch to compact view"} title={compactView ? "Switch to full view" : "Switch to compact view"} aria-pressed={compactView} onClick={() => setCompactView(view => !view)}>{compactView ? <ListChevronsUpDown size={16} /> : <ListChevronsDownUp size={16} />}</button><label className="search-field"><span className="sr-only">Search fleet</span><Search size={15} /><input value={query} onChange={event => setQuery(event.target.value)} type="search" placeholder="Search vehicle, driver or location" /><kbd>⌘ K</kbd></label></div><div id="fleet-filters" className="fleet-filter-panel" hidden={!filtersOpen}><div className="filter-panel-heading"><b>Filters</b><button onClick={() => { setLocation('all'); setFilter('all'); }}>Clear all</button></div><LocationFilter location={location} onChange={setLocation} /><p>{filtered.length} matching vehicles</p></div><div className="status-filters" role="group" aria-label="Filter vehicles by status">{[['all','All'],['moving','Moving'],['idle','Idle'],['alert','Alerts']].map(([key,label]) => <button type="button" key={key} className={filter === key ? 'active' : ''} aria-pressed={filter === key} onClick={() => setFilter(key)}>{label}</button>)}</div><div className={`fleet-list ${compactView ? 'compact' : ''}`}>{filtered.slice(0, 100).map(vehicle => <VehicleRow key={vehicle.id} vehicle={vehicle} compact={compactView} selected={vehicle.id === selectedId} onSelect={openVehicle} onLocate={vehicle => { setSelectedId(vehicle.id); setDetailId(vehicle.id); setLocateTarget({...vehicle, _ts: Date.now()}); }} />)}</div>{filtered.length === 0 && <div className="fleet-empty"><Search size={24} /><b>No vehicles found</b><p>Try a different search or status filter.</p></div>}</aside><button type="button" className="fleet-panel-toggle" aria-label={panelCollapsed ? "Expand fleet panel" : "Collapse fleet panel"} title={panelCollapsed ? "Expand fleet panel" : "Collapse fleet panel"} aria-controls="fleet-panel" aria-expanded={!panelCollapsed} onClick={() => setPanelCollapsed(value => !value)}>{panelCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button><div className="fleet-resizer" role="separator" tabIndex={0} aria-label="Resize fleet panel" aria-controls="fleet-panel" aria-orientation="vertical" aria-valuemin={20} aria-valuemax={60} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth}% of viewport width`} title="Drag to resize fleet panel" onPointerDown={event => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); event.currentTarget.focus(); setResizing(true); }} onPointerMove={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) resizeFromPointer(event); }} onPointerUp={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); setResizing(false); }} onLostPointerCapture={() => setResizing(false)} onKeyDown={handleResizeKey}><span aria-hidden="true" /></div><FleetMap visibleVehicles={filtered} selectedId={selectedId} onSelect={openVehicle} locateTarget={locateTarget} detailVehicle={detailVehicle} playback={playback} progress={progress} />{detailVehicle && <VehicleDetails key={detailVehicle.id} vehicle={detailVehicle} onClose={() => {setDetailId(null);setPlayback(false)}} onLocate={vehicle => setLocateTarget({...vehicle, _ts: Date.now()})} playback={playback} setPlayback={setPlayback} progress={progress} setProgress={setProgress} />}</section>;
 }
 
 function App({ onNotice }) {
