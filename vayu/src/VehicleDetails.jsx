@@ -307,7 +307,7 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
             onClick={() => { setTab('overview'); setPlayback(false); setPlaying(false); }}
           >
             <Gauge size={14} strokeWidth={2} />
-            <span>Overview</span>
+            <span>Live Details</span>
           </button>
           <button
             type="button"
