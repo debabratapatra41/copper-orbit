@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CircleMarker, Polyline, useMap } from 'react-leaflet';
-import { X } from 'lucide-react';
+import { Gauge, History, X } from 'lucide-react';
 
 export function PlaybackMap({ vehicle, progress, active }) {
   const map = useMap();
@@ -44,7 +44,7 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
         <button className="co-icon-button" aria-label="Close vehicle details" onClick={onClose}><X size={18}/></button>
       </div>
 
-      {/* Big Tab Switcher at the Top Middle */}
+      {/* Refined Segmented Tab Switcher at the Top Middle */}
       <div className="details-switcher-wrap">
         <div className="details-segmented-switcher" role="tablist" aria-label="Vehicle details sections">
           <button
@@ -54,7 +54,8 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
             className={`segmented-tab ${tab === 'overview' ? 'active' : ''}`}
             onClick={() => { setTab('overview'); setPlayback(false); setPlaying(false); }}
           >
-            Overview
+            <Gauge size={14} strokeWidth={2} />
+            <span>Overview</span>
           </button>
           <button
             type="button"
@@ -63,7 +64,8 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
             className={`segmented-tab ${tab === 'history' ? 'active' : ''}`}
             onClick={() => setTab('history')}
           >
-            History
+            <History size={14} strokeWidth={2} />
+            <span>History</span>
           </button>
         </div>
       </div>
