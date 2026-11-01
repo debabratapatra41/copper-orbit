@@ -322,27 +322,7 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
         </div>
       </div>
 
-      {/* Normal Tabs: Timeline | Trips | Events */}
-      {tab === 'history' && (
-        <div className="history-normal-tabs-bar">
-          <div className="history-normal-tabs" role="tablist" aria-label="History view">
-            {['timeline', 'trips', 'events'].map(item => (
-              <button
-                key={item}
-                type="button"
-                role="tab"
-                aria-selected={view === item}
-                className={`history-normal-tab ${view === item ? 'active' : ''}`}
-                onClick={() => setView(item)}
-              >
-                {item[0].toUpperCase() + item.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Product Date & Time Range Picker Bar */}
+      {/* Product Date & Time Range Picker Bar (Above Timeline, Trips, Events tabs) */}
       {tab === 'history' && (
         <div className="history-date-filter-bar">
           <div className="date-picker-dropdown">
@@ -568,6 +548,26 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
             >
               2 Days
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Normal Tabs: Timeline | Trips | Events */}
+      {tab === 'history' && (
+        <div className="history-normal-tabs-bar">
+          <div className="history-normal-tabs" role="tablist" aria-label="History view">
+            {['timeline', 'trips', 'events'].map(item => (
+              <button
+                key={item}
+                type="button"
+                role="tab"
+                aria-selected={view === item}
+                className={`history-normal-tab ${view === item ? 'active' : ''}`}
+                onClick={() => setView(item)}
+              >
+                {item[0].toUpperCase() + item.slice(1)}
+              </button>
+            ))}
           </div>
         </div>
       )}

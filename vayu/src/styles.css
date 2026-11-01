@@ -75,7 +75,7 @@
 .history-normal-tab{border:0;background:transparent;padding:10px 14px;font-size:13px;font-weight:500;color:#77756f;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s;font-family:inherit;white-space:nowrap}
 .history-normal-tab:hover:not(.active){color:var(--text)}
 .history-normal-tab.active{color:var(--accent-strong);border-bottom-color:var(--accent);font-weight:650}
-.history-date-filter-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 16px;border-bottom:1px solid var(--border);background:#faf9f6;flex-shrink:0}
+.history-date-filter-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 16px;border-bottom:1px solid var(--border);background:#faf9f6;flex-shrink:0;position:relative;z-index:50}
 .date-picker-dropdown{position:relative;flex:1;min-width:0}
 .date-picker-trigger{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:12.5px;font-weight:600;color:var(--text);cursor:pointer;transition:all .15s ease;max-width:100%}
 .date-picker-trigger:hover,.date-picker-trigger.active{border-color:#d4d1cb;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
