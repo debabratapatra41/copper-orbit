@@ -464,8 +464,8 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
 
-  // Telemetry graph state: 'speed' | 'gforce' | 'accel' | 'all'
-  const [showGraphs, setShowGraphs] = useState(true);
+  // Telemetry graph state: 'speed' | 'gforce' | 'accel' | 'all' (disabled by default)
+  const [showGraphs, setShowGraphs] = useState(false);
   const [telemetryMetric, setTelemetryMetric] = useState('speed');
   const [hoverProgress, setHoverProgress] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -495,6 +495,7 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
     setStartTime('00:00');
     setEndTime('23:59');
     setCalendarOpen(false);
+    setShowGraphs(false);
   }, [vehicle.id]);
 
   useEffect(() => {
