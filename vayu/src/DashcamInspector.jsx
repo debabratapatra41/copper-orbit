@@ -449,7 +449,7 @@ export function DashcamHoverCard({
     <div
       className={`dashcam-hover-card ${isPinned ? 'is-pinned' : ''}`}
       role="region"
-      aria-label={`Dashcam & Telemetry inspection for ${vehicle?.id || 'vehicle'} at ${timeStr} IST`}
+      aria-label={`Camera & Telemetry inspection for ${vehicle?.id || 'vehicle'} at ${timeStr} IST`}
       onClick={e => e.stopPropagation()}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -496,9 +496,9 @@ export function DashcamHoverCard({
           <button
             type="button"
             className="dashcam-icon-btn highlight"
-            title="Open HD Dashcam Studio"
+            title="Open Video Studio"
             onClick={() => onOpenStudio && onOpenStudio(progress)}
-            aria-label="Expand Dashcam Studio"
+            aria-label="Expand Studio"
           >
             <Maximize2 size={13} />
           </button>
@@ -516,15 +516,15 @@ export function DashcamHoverCard({
         </div>
       </div>
 
-      {/* 16:9 Dashcam Video Viewport */}
+      {/* 16:9 Video Viewport */}
       <div
         className="dashcam-viewport"
         onClick={() => onOpenStudio && onOpenStudio(progress)}
-        title="Click to open Fullscreen HD Dashcam Studio"
+        title="Click to open Fullscreen Video Studio"
       >
         <img
           src={currentImg}
-          alt={`Dashcam view at ${timeStr} IST`}
+          alt={`Camera view at ${timeStr} IST`}
           className={`dashcam-img ${imgLoaded ? 'loaded' : ''}`}
           onLoad={() => setImgLoaded(true)}
         />
@@ -723,7 +723,7 @@ export function DashcamStudioModal({
   const { movement, dashcam, timeStr, event } = currentPt;
 
   const handleExportFrame = () => {
-    setExportNotice(`Exported Dashcam Frame: ${vehicle?.id || 'VY'}_${timeStr.replace(/:/g, '')}.jpg`);
+    setExportNotice(`Exported Frame: ${vehicle?.id || 'VY'}_${timeStr.replace(/:/g, '')}.jpg`);
     setTimeout(() => setExportNotice(''), 3000);
   };
 
@@ -750,7 +750,7 @@ export function DashcamStudioModal({
         <div className="studio-header">
           <div className="studio-title-group">
             <span className="studio-tag">
-              <Camera size={13} /> DASHCAM TELEMATICS STUDIO
+              <Camera size={13} /> VIDEO REPLAY STUDIO
             </span>
             <h2>
               {vehicle?.id || 'VY-1001'} · {vehicle?.name || 'Commercial EV'}
@@ -762,7 +762,7 @@ export function DashcamStudioModal({
 
           <div className="studio-header-actions">
             <span className="studio-rec-pill">
-              <span className="rec-dot" /> LIVE TELEMATICS SYNC
+              <span className="rec-dot" /> LIVE RECORDING
             </span>
             <button
               type="button"
@@ -776,7 +776,7 @@ export function DashcamStudioModal({
               type="button"
               className="studio-close-btn"
               onClick={onClose}
-              aria-label="Close Dashcam Studio"
+              aria-label="Close Studio"
             >
               <X size={18} />
             </button>
@@ -788,7 +788,7 @@ export function DashcamStudioModal({
         {/* Main 16:9 Video Canvas with PiP secondary camera */}
         <div className="studio-screen-wrap">
           <div className="studio-main-screen">
-            <img src={primaryImg} alt="Primary Dashcam Angle" className="studio-primary-img" />
+            <img src={primaryImg} alt="Primary Camera Angle" className="studio-primary-img" />
             <div className="dashcam-lens-vignette" />
 
             {/* OSD Top Bar */}

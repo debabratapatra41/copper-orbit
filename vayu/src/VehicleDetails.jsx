@@ -4,7 +4,6 @@ import {
   Activity,
   AlertTriangle,
   Calendar,
-  Camera,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -1140,10 +1139,7 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
                           key={`${dayKey}-${event.at}`}
                           onClick={() => { setPlayback(true); setPlaying(false); setProgress(event.at); }}
                         >
-                          <b>
-                            {event.time} IST · {event.label}
-                            <span className="event-cam-badge"><Camera size={11} /> Dashcam</span>
-                          </b>
+                          <b>{event.time} IST · {event.label}</b>
                           <span>{event.detail} · Select to view on map</span>
                         </button>
                       ))}
