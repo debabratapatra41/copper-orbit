@@ -53,13 +53,14 @@ const vehicles = Array.from({length: 3000}, (_, index) => {
   return {...seed, status: offline ? 'alert' : seed.status, fuel: kind === 'energy' ? '18%' : seed.fuel, updated, driver: `${firstNames[driverIndex % firstNames.length]} ${lastNames[Math.floor(driverIndex / firstNames.length)]}`, updatedAt: new Date(sampleTime - (parseInt(updated, 10) || 0) * 60000), id: `VY-${String(index + 1001).padStart(4,'0')}`, location: hub[2], sampleContext: scenarios[kind], position: [hub[0] + Math.sin(n * 12.989 + index) * (0.04 + (n % 10) * 0.025), hub[1] + Math.cos(n * 7.31 + index) * (0.04 + (n % 10) * 0.025)]};
 });
 
-function ClusteredVehicles({ vehicles: items, onSelect, activeId }) {
+function ClusteredVehicles({ vehicles: items, onSelect, activeId, clustersReady = true }) {
   const map = useMap();
   const markerMapRef = useRef(new Map());
   const activeIdRef = useRef(activeId);
   activeIdRef.current = activeId;
 
   useEffect(() => {
+    if (!clustersReady) return;
     const cluster = L.markerClusterGroup({ maxClusterRadius: 55, chunkedLoading: true });
     markerMapRef.current.clear();
 
@@ -112,7 +113,7 @@ function ClusteredVehicles({ vehicles: items, onSelect, activeId }) {
 
     map.addLayer(cluster);
     return () => { map.removeLayer(cluster); };
-  }, [map, items, onSelect]);
+  }, [map, items, onSelect, clustersReady]);
 
   // Fast active marker class toggle without re-clustering
   const prevActiveRef = useRef(null);
@@ -336,11 +337,55 @@ function VayuBasemap() {
   return null;
 }
 
+function MapEntranceController({ onMapZoomDone }) {
+  const map = useMap();
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
+    // Start with wider view (zoom 1.4)
+    map.setView([20, 0], 1.4, { animate: false });
+
+    // Smoothly fly/zoom into the operational view after top bar and left panel slide in
+    const timerFly = setTimeout(() => {
+      map.flyTo([20, 10], 2, {
+        duration: 1.15,
+        easeLinearity: 0.25
+      });
+    }, 450);
+
+    // After map finishes zooming in, trigger the cluster load and magnification
+    const timerDone = setTimeout(() => {
+      if (onMapZoomDone) onMapZoomDone();
+    }, 1600);
+
+    return () => {
+      clearTimeout(timerFly);
+      clearTimeout(timerDone);
+    };
+  }, [map, onMapZoomDone]);
+
+  return null;
+}
+
 function FleetMap({ visibleVehicles, selectedId, onSelect, locateTarget, detailVehicle, playback, setPlayback, progress, setProgress }) {
   const activeId = detailVehicle?.id;
+  const [clustersReady, setClustersReady] = useState(false);
+  const [clustersLoading, setClustersLoading] = useState(false);
+
+  const handleMapZoomDone = useCallback(() => {
+    setClustersReady(true);
+    setClustersLoading(true);
+    setTimeout(() => {
+      setClustersLoading(false);
+    }, 1600);
+  }, []);
+
   return (
     <div className="map-panel">
-      <div className={`map-canvas ${activeId ? 'has-active-vehicle' : ''}`}>
+      <div className={`map-canvas ${activeId ? 'has-active-vehicle' : ''} ${clustersLoading ? 'initial-clusters-loading' : ''}`}>
         {activeId && (
           <style>{`
             .has-active-vehicle .fleet-map-marker:not(.marker-id-${activeId}) {
@@ -368,10 +413,11 @@ function FleetMap({ visibleVehicles, selectedId, onSelect, locateTarget, detailV
             }
           `}</style>
         )}
-        <MapContainer center={[20, 0]} zoom={2} minZoom={2} maxZoom={17} zoomControl={false} attributionControl scrollWheelZoom>
+        <MapContainer center={[20, 0]} zoom={1.4} minZoom={1} maxZoom={17} zoomControl={false} attributionControl scrollWheelZoom>
           <VayuBasemap />
           <MapResizeObserver />
-          <ClusteredVehicles vehicles={visibleVehicles} onSelect={onSelect} activeId={activeId} />
+          <MapEntranceController onMapZoomDone={handleMapZoomDone} />
+          <ClusteredVehicles vehicles={visibleVehicles} onSelect={onSelect} activeId={activeId} clustersReady={clustersReady || Boolean(detailVehicle)} />
           <PlaybackMap vehicle={detailVehicle} active={playback} progress={progress} setProgress={setProgress} setPlayback={setPlayback} />
           <LocateVehicle target={locateTarget} detailVehicle={detailVehicle} playback={playback} />
           <MapControls />
@@ -433,6 +479,18 @@ function FleetWorkspace({ onNotice }) {
 function App({ onNotice }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.add('page-entrance-active');
+    const timer = setTimeout(() => {
+      document.body.classList.remove('page-entrance-active');
+    }, 2800);
+    return () => {
+      document.body.classList.remove('page-entrance-active');
+      clearTimeout(timer);
+    };
+  }, []);
+
   return <><MainNavigation onNotice={onNotice} /><main className="vayu-main" id="fleet"><section className="page-heading"><div><p className="breadcrumb">Management <span>/</span> Fleet Details & Map</p><div className="title-line"><h1>Fleet Details & Map</h1><button className={`bookmark-trigger ${bookmarked ? 'active' : ''}`} aria-label="Bookmark Fleet Details & Map" aria-pressed={bookmarked} onClick={() => setBookmarked(!bookmarked)}><Bookmark size={17} fill={bookmarked ? 'currentColor' : 'none'} /></button></div></div><div className="page-actions"><span className="last-updated"><i />Updated just now</span><button className="co-button" onClick={() => onNotice('Export will be available in a later step.')}><Download size={14} />Export</button><div className="more-menu-wrap" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setMoreOpen(false); }} onKeyDown={event => { if (event.key === 'Escape') { setMoreOpen(false); event.currentTarget.querySelector('button')?.focus(); } }}><button className="co-icon-button" aria-label="More options" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)}><MoreHorizontal size={20} /></button>{moreOpen && <div className="more-menu" role="menu"><button role="menuitem" onClick={() => { setMoreOpen(false); onNotice('Messages will be available in a later step.'); }}>Show messages</button><button role="menuitem" onClick={() => { setMoreOpen(false); onNotice('Safety controls will be available in a later step.'); }}>Disable Safety</button></div>}</div></div></section><FleetWorkspace onNotice={onNotice} /></main></>;
 }
 

@@ -626,6 +626,84 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
     }
   }, [isDragging]);
 
+  // Event pills horizontal scroll and drag-to-scroll handlers
+  const pillsRowRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const isPanningRef = useRef(false);
+  const panStartXRef = useRef(0);
+  const panStartScrollRef = useRef(0);
+  const panMovedRef = useRef(false);
+
+  const updateScrollButtons = useCallback(() => {
+    const el = pillsRowRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 3);
+  }, []);
+
+  const handleScrollPills = useCallback((delta) => {
+    const el = pillsRowRef.current;
+    if (!el) return;
+    el.scrollBy({ left: delta, behavior: 'smooth' });
+    setTimeout(updateScrollButtons, 250);
+  }, [updateScrollButtons]);
+
+  const handlePillsWheel = useCallback((e) => {
+    const el = pillsRowRef.current;
+    if (!el) return;
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && e.deltaY !== 0) {
+      el.scrollLeft += e.deltaY;
+      updateScrollButtons();
+    }
+  }, [updateScrollButtons]);
+
+  const handlePillMouseDown = useCallback((e) => {
+    const el = pillsRowRef.current;
+    if (!el) return;
+    isPanningRef.current = true;
+    panStartXRef.current = e.clientX;
+    panStartScrollRef.current = el.scrollLeft;
+    panMovedRef.current = false;
+  }, []);
+
+  const handlePillMouseMove = useCallback((e) => {
+    if (!isPanningRef.current) return;
+    const delta = e.clientX - panStartXRef.current;
+    if (Math.abs(delta) > 3) {
+      panMovedRef.current = true;
+    }
+    const el = pillsRowRef.current;
+    if (el) {
+      el.scrollLeft = panStartScrollRef.current - delta;
+      updateScrollButtons();
+    }
+  }, [updateScrollButtons]);
+
+  const handlePillMouseUp = useCallback(() => {
+    isPanningRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    updateScrollButtons();
+    const el = pillsRowRef.current;
+    if (!el) return;
+    const handleResize = () => updateScrollButtons();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [updateScrollButtons, showGraphs, playback]);
+
+  // Auto-scroll active event pill into view
+  useEffect(() => {
+    const el = pillsRowRef.current;
+    if (!el) return;
+    const activeBtn = el.querySelector('.incident-pill.active');
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      setTimeout(updateScrollButtons, 300);
+    }
+  }, [progress, updateScrollButtons]);
+
   // Multi-day events dataset
   const eventsByDay = useMemo(() => {
     return {
@@ -1505,27 +1583,63 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
               {/* Quick-Jump Event Strip */}
               <div className="telemetry-incidents-strip" aria-label="Trip events">
                 <span className="incidents-strip-title">Events:</span>
-                <div className="incidents-pills-row">
-                  {telemetryData.incidents.map(inc => {
-                    const isCurrent = Math.abs(progress - inc.progress) <= 2;
-                    return (
-                      <button
-                        key={inc.progress}
-                        type="button"
-                        className={`incident-pill ${inc.event.severity} ${isCurrent ? 'active' : ''}`}
-                        onClick={() => {
-                          setPlaying(false);
-                          setProgress(inc.progress);
-                        }}
-                        title={`Jump to ${inc.timeStr.slice(0, 5)} IST · ${inc.event.label}`}
-                      >
-                        <span className={`incident-indicator-dot ${inc.event.severity}`} />
-                        <span className="incident-time">{inc.timeStr.slice(0, 5)}</span>
-                        <span className="incident-text">{inc.event.label}</span>
-                        {inc.event.badge && <span className="incident-badge">{inc.event.badge}</span>}
-                      </button>
-                    );
-                  })}
+                <div className="incidents-strip-scroll-wrap">
+                  {canScrollLeft && (
+                    <button
+                      type="button"
+                      className="pills-scroll-btn prev"
+                      onClick={() => handleScrollPills(-160)}
+                      aria-label="Scroll events left"
+                      title="Scroll left"
+                    >
+                      <ChevronLeft size={13} />
+                    </button>
+                  )}
+
+                  <div
+                    className="incidents-pills-row"
+                    ref={pillsRowRef}
+                    onWheel={handlePillsWheel}
+                    onScroll={updateScrollButtons}
+                    onMouseDown={handlePillMouseDown}
+                    onMouseMove={handlePillMouseMove}
+                    onMouseUp={handlePillMouseUp}
+                    onMouseLeave={handlePillMouseUp}
+                  >
+                    {telemetryData.incidents.map(inc => {
+                      const isCurrent = Math.abs(progress - inc.progress) <= 2;
+                      return (
+                        <button
+                          key={inc.progress}
+                          type="button"
+                          className={`incident-pill ${inc.event.severity} ${isCurrent ? 'active' : ''}`}
+                          onClick={() => {
+                            if (panMovedRef.current) return;
+                            setPlaying(false);
+                            setProgress(inc.progress);
+                          }}
+                          title={`Jump to ${inc.timeStr.slice(0, 5)} IST · ${inc.event.label}`}
+                        >
+                          <span className={`incident-indicator-dot ${inc.event.severity}`} />
+                          <span className="incident-time">{inc.timeStr.slice(0, 5)}</span>
+                          <span className="incident-text">{inc.event.label}</span>
+                          {inc.event.badge && <span className="incident-badge">{inc.event.badge}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {canScrollRight && (
+                    <button
+                      type="button"
+                      className="pills-scroll-btn next"
+                      onClick={() => handleScrollPills(160)}
+                      aria-label="Scroll events right"
+                      title="Scroll right"
+                    >
+                      <ChevronRight size={13} />
+                    </button>
+                  )}
                 </div>
               </div>
 

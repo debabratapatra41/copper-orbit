@@ -602,6 +602,7 @@
   gap: 8px;
   overflow: hidden;
   margin-top: 2px;
+  min-width: 0;
 }
 
 .incidents-strip-title {
@@ -611,17 +612,74 @@
   flex-shrink: 0;
 }
 
+.incidents-strip-scroll-wrap {
+  display: flex;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+}
+
+.pills-scroll-btn {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: #57534e;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: all 0.15s ease;
+  padding: 0;
+  z-index: 2;
+}
+
+.pills-scroll-btn:hover {
+  background: var(--surface-subtle);
+  border-color: #d1cfc9;
+  color: var(--accent-strong);
+}
+
 .incidents-pills-row {
   display: flex;
   align-items: center;
   gap: 5px;
   overflow-x: auto;
-  scrollbar-width: none;
-  padding: 1px 0;
+  scrollbar-width: thin;
+  scrollbar-color: #e5e3dc transparent;
+  padding: 2px 2px 3px;
+  flex: 1;
+  min-width: 0;
+  cursor: grab;
+  scroll-behavior: smooth;
+  user-select: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.incidents-pills-row:active {
+  cursor: grabbing;
 }
 
 .incidents-pills-row::-webkit-scrollbar {
-  display: none;
+  height: 3px;
+}
+
+.incidents-pills-row::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.incidents-pills-row::-webkit-scrollbar-thumb {
+  background: #e2e0d8;
+  border-radius: 999px;
+}
+
+.incidents-pills-row::-webkit-scrollbar-thumb:hover {
+  background: #b5b2aa;
 }
 
 .incident-pill {
@@ -2069,4 +2127,164 @@
   align-items: center;
   gap: 3px;
   letter-spacing: 0.03em;
+}
+
+/* ==========================================================================
+   Page Load Choreographed Entrance Animations
+   1. Top bar slides in from top
+   2. Left fleet panel slides in from left
+   3. Map smoothly zooms in
+   4. Clusters load & magnify from small to normal
+   ========================================================================== */
+
+body.page-entrance-active {
+  overflow-x: hidden;
+}
+
+/* Top bar comes down from the top */
+@keyframes vayuTopBarEntrance {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Page heading comes down slightly after top bar */
+@keyframes vayuPageHeadingEntrance {
+  0% {
+    transform: translateY(-28px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Left panel comes in from the left */
+@keyframes vayuLeftPanelEntrance {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0.2;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Panel toggle and resizer slide in with the panel */
+@keyframes vayuPanelAuxEntrance {
+  0% {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Map controls slide in from top-right */
+@keyframes vayuMapControlsEntrance {
+  0% {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.page-entrance-active .vayu-header {
+  animation: vayuTopBarEntrance 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+.page-entrance-active .page-heading {
+  animation: vayuPageHeadingEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+  will-change: transform, opacity;
+}
+
+.page-entrance-active .fleet-panel:not([hidden]) {
+  animation: vayuLeftPanelEntrance 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+  will-change: transform, opacity;
+}
+
+.page-entrance-active .fleet-panel-toggle,
+.page-entrance-active .fleet-resizer {
+  animation: vayuPanelAuxEntrance 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+}
+
+.page-entrance-active .map-controls {
+  animation: vayuMapControlsEntrance 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
+}
+
+/* Cluster magnification animation: starts small (scale 0.05) and magnifies to normal */
+@keyframes clusterMagnifyIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.05);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.16);
+  }
+  85% {
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.initial-clusters-loading .marker-cluster div,
+.initial-clusters-loading .moving-marker {
+  animation: clusterMagnifyIn 0.62s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: center center;
+}
+
+/* Stagger cluster arrivals across markers for a lively organic entrance */
+.initial-clusters-loading .leaflet-marker-pane > :nth-child(2n) .marker-cluster div,
+.initial-clusters-loading .leaflet-marker-pane > :nth-child(2n) .moving-marker {
+  animation-delay: 0.07s;
+}
+
+.initial-clusters-loading .leaflet-marker-pane > :nth-child(3n) .marker-cluster div,
+.initial-clusters-loading .leaflet-marker-pane > :nth-child(3n) .moving-marker {
+  animation-delay: 0.14s;
+}
+
+.initial-clusters-loading .leaflet-marker-pane > :nth-child(5n) .marker-cluster div,
+.initial-clusters-loading .leaflet-marker-pane > :nth-child(5n) .moving-marker {
+  animation-delay: 0.21s;
+}
+
+.initial-clusters-loading .leaflet-marker-pane > :nth-child(7n) .marker-cluster div,
+.initial-clusters-loading .leaflet-marker-pane > :nth-child(7n) .moving-marker {
+  animation-delay: 0.28s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-entrance-active .vayu-header,
+  .page-entrance-active .page-heading,
+  .page-entrance-active .fleet-panel:not([hidden]),
+  .page-entrance-active .fleet-panel-toggle,
+  .page-entrance-active .fleet-resizer,
+  .page-entrance-active .map-controls,
+  .initial-clusters-loading .marker-cluster div,
+  .initial-clusters-loading .moving-marker {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
 }
