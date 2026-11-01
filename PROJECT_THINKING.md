@@ -117,6 +117,26 @@ Confirmed
 
 ## Notes template
 
+### 2026-11-01 · Portfolio presentation
+
+Vayu is a design portfolio prototype. The user wants the interface to look and read like a finished product, without prominent notices that the prototype is not connected to live data.
+
+### 2026-11-01 · Resizable fleet panel
+
+The fleet list should start at 30% of the viewport width and be resizable from 20% to 60%, allowing fleet managers to balance list detail and map space.
+
+### 2026-11-01 · Readable spacing
+
+The user wants a 14px base font across Vayu, with enough space around text and controls to keep the interface comfortable and readable. Balance this with the fleet manager's need for a compact, map-first workspace; offer a denser card view when needed.
+
+### 2026-11-01 · Vehicle graph inspection
+
+The fleet manager should be able to inspect telemetry by hovering anywhere across a card's graph, not only on individual samples. Show a vertical guide, a point on the visible line, and the value with exact time. In missing-data intervals, keep the guide but do not invent a reading or point.
+
+### 2026-10-31 · Fleet UX exploration
+
+The user requested standalone iterations exploring fleet-manager workflows, including vehicle history and interactions. Proposed directions in `vayu/public/iterux.html` are exploratory: map-first overview, contextual vehicle details and history, and exception-first triage. These are not yet confirmed product requirements. Maintain the compact enterprise layout, global map context, readable vehicle information, explicit last-driver labels, and safe action patterns.
+
 ### 2026-10-31 · Drivers and inactive vehicles
 
 The user wants a sample population of 1,000 drivers for the fleet. Vehicles that are not active should show the last driver rather than imply a driver is currently assigned. In the prototype, idle vehicles use the “Last driven by” label.

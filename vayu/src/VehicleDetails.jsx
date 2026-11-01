@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CircleMarker, Polyline, useMap } from 'react-leaflet';
-import { Calendar, ChevronDown, ChevronLeft, ChevronRight, Gauge, History, X } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, Clock, Gauge, History, X } from 'lucide-react';
 
 export function PlaybackMap({ vehicle, progress, active }) {
   const map = useMap();
@@ -41,7 +41,16 @@ export function PlaybackMap({ vehicle, progress, active }) {
   );
 }
 
-// Helper date utilities
+// 30-minute intervals for smooth, precise time picking
+const timeOptions = [
+  '00:00', '00:30', '01:00', '01:30', '02:00', '02:30', '03:00', '03:30',
+  '04:00', '04:30', '05:00', '05:30', '06:00', '06:30', '07:00', '07:30',
+  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+  '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
+  '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
+  '20:00', '20:30', '21:00', '21:30', '22:00', '22:30', '23:00', '23:30', '23:59'
+];
+
 function toDateKey(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -74,6 +83,10 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
   const [displayMonth, setDisplayMonth] = useState(new Date(2026, 9, 1)); // October 2026
   const [calendarWarning, setCalendarWarning] = useState('');
 
+  // Time Window state (in IST): default to All Day ('00:00' to '23:59')
+  const [startTime, setStartTime] = useState('00:00');
+  const [endTime, setEndTime] = useState('23:59');
+
   useEffect(() => {
     setTab('overview');
     setPlaying(false);
@@ -81,6 +94,8 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
     setPlayback(false);
     setStartDate('2026-10-31');
     setEndDate('2026-10-31');
+    setStartTime('00:00');
+    setEndTime('23:59');
     setCalendarOpen(false);
   }, [vehicle.id]);
 
@@ -98,7 +113,7 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
     return () => clearInterval(timer);
   }, [playing, playback, speed, setProgress]);
 
-  // Click outside to close calendar
+  // Click outside to close popover
   useEffect(() => {
     const handlePointerDown = e => {
       if (!e.target.closest('.date-picker-dropdown')) {
@@ -148,9 +163,9 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
 
   const tripsByDay = useMemo(() => {
     return {
-      '2026-10-31': { timeRange: '09:52–10:42', distance: vehicle.trip || '18.4 km', area: vehicle.location },
-      '2026-10-30': { timeRange: '08:30–17:05', distance: '38.6 km', area: `${vehicle.location} Industrial Zone` },
-      '2026-10-29': { timeRange: '09:10–16:45', distance: '31.2 km', area: `${vehicle.location} Express Ring` }
+      '2026-10-31': { timeRange: '09:52–10:42', start: '09:52', end: '10:42', distance: vehicle.trip || '18.4 km', area: vehicle.location },
+      '2026-10-30': { timeRange: '08:30–17:05', start: '08:30', end: '17:05', distance: '38.6 km', area: `${vehicle.location} Industrial Zone` },
+      '2026-10-29': { timeRange: '09:10–16:45', start: '09:10', end: '16:45', distance: '31.2 km', area: `${vehicle.location} Express Ring` }
     };
   }, [vehicle]);
 
@@ -159,18 +174,15 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
     setCalendarWarning('');
 
     if (startDate === endDate) {
-      // 1 day currently selected: clicking another day
       const d1 = parseDateKey(startDate);
       const d2 = parseDateKey(dayKey);
       const diffMs = Math.abs(d2.getTime() - d1.getTime());
       const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
       if (diffDays === 0) {
-        // Clicked same day: keep single day
         setStartDate(dayKey);
         setEndDate(dayKey);
       } else if (diffDays === 1) {
-        // Exactly adjacent day: valid 2-day range!
         if (d1 < d2) {
           setStartDate(startDate);
           setEndDate(dayKey);
@@ -179,13 +191,11 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
           setEndDate(startDate);
         }
       } else {
-        // Exceeded 2 days: reset to new 1-day selection and show notice
         setStartDate(dayKey);
         setEndDate(dayKey);
         setCalendarWarning('Maximum selection is 2 days at a time. Started new range.');
       }
     } else {
-      // Already 2 days selected: start fresh single day selection
       setStartDate(dayKey);
       setEndDate(dayKey);
     }
@@ -204,25 +214,42 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
       setStartDate('2026-10-30');
       setEndDate('2026-10-31');
     }
-    setCalendarOpen(false);
   };
+
+  // Quick Shift Time Presets
+  const setTimePreset = (from, to) => {
+    setStartTime(from);
+    setEndTime(to);
+  };
+
+  const isAllDay = startTime === '00:00' && endTime === '23:59';
+  const isMorningShift = startTime === '06:00' && endTime === '14:00';
+  const isBusinessDay = startTime === '09:00' && endTime === '18:00';
+  const isEveningShift = startTime === '14:00' && endTime === '22:00';
 
   const isToday = startDate === '2026-10-31' && endDate === '2026-10-31';
   const isYesterday = startDate === '2026-10-30' && endDate === '2026-10-30';
   const is2Days = startDate === '2026-10-30' && endDate === '2026-10-31';
 
-  // Date range display string for trigger
+  // Label for trigger: date range + optional time window
   const dateRangeLabel = useMemo(() => {
-    if (isToday) return 'Today (31 Oct)';
-    if (isYesterday) return 'Yesterday (30 Oct)';
-    if (startDate === endDate) {
+    let dateStr = '';
+    if (isToday) dateStr = 'Today (31 Oct)';
+    else if (isYesterday) dateStr = 'Yesterday (30 Oct)';
+    else if (startDate === endDate) {
       const d = parseDateKey(startDate);
-      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    } else {
+      const d1 = parseDateKey(startDate);
+      const d2 = parseDateKey(endDate);
+      dateStr = `${d1.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${d2.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
     }
-    const d1 = parseDateKey(startDate);
-    const d2 = parseDateKey(endDate);
-    return `${d1.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${d2.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
-  }, [startDate, endDate, isToday, isYesterday]);
+
+    if (!isAllDay) {
+      return `${dateStr} · ${startTime}–${endTime}`;
+    }
+    return dateStr;
+  }, [startDate, endDate, isToday, isYesterday, isAllDay, startTime, endTime]);
 
   // List of active date keys in current range (sorted latest first)
   const activeDateKeys = useMemo(() => {
@@ -315,7 +342,7 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
         </div>
       )}
 
-      {/* Product Date Range Picker Bar (Above History Timelines/Trips/Events) */}
+      {/* Product Date & Time Range Picker Bar */}
       {tab === 'history' && (
         <div className="history-date-filter-bar">
           <div className="date-picker-dropdown">
@@ -323,7 +350,7 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
               type="button"
               className={`date-picker-trigger ${calendarOpen ? 'active' : ''}`}
               onClick={() => setCalendarOpen(!calendarOpen)}
-              aria-label="Change history date range"
+              aria-label="Change history date and time range"
               aria-expanded={calendarOpen}
             >
               <Calendar size={13} className="date-picker-icon" />
@@ -332,9 +359,11 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
               <ChevronDown size={13} className={`date-picker-chevron ${calendarOpen ? 'open' : ''}`} />
             </button>
 
-            {/* Interactive Popover Calendar */}
+            {/* Interactive Popover Calendar + Time Selector */}
             {calendarOpen && (
-              <div className="date-picker-popover" role="dialog" aria-label="Select history date range">
+              <div className="date-picker-popover" role="dialog" aria-label="Select history date and time range">
+                {/* 1. Date Range Section */}
+                <div className="popover-section-label">Date Range (Max 2 Days)</div>
                 <div className="calendar-header">
                   <button
                     type="button"
@@ -402,26 +431,115 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
                   </div>
                 )}
 
-                {/* Popover Footer with Presets & Max Range Constraint note */}
-                <div className="cal-footer">
-                  <div className="cal-max-note">
-                    Max range: <b>2 days</b> at a time
-                  </div>
-                  <div className="cal-quick-actions">
-                    <button type="button" className="cal-preset-action" onClick={() => setQuickPreset('today')}>
-                      Today
+                {/* Quick Date Presets Row inside popover */}
+                <div className="cal-date-presets-row">
+                  <button
+                    type="button"
+                    className={`cal-preset-action ${isToday ? 'active' : ''}`}
+                    onClick={() => setQuickPreset('today')}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    className={`cal-preset-action ${isYesterday ? 'active' : ''}`}
+                    onClick={() => setQuickPreset('yesterday')}
+                  >
+                    Yesterday
+                  </button>
+                  <button
+                    type="button"
+                    className={`cal-preset-action ${is2Days ? 'active' : ''}`}
+                    onClick={() => setQuickPreset('2days')}
+                  >
+                    Last 2 Days
+                  </button>
+                </div>
+
+                {/* 2. Time Window Section (in IST) */}
+                <div className="date-picker-time-section">
+                  <div className="time-section-header">
+                    <span className="time-title">
+                      <Clock size={12} /> Time Window (IST)
+                    </span>
+                    <button
+                      type="button"
+                      className={`time-all-day-btn ${isAllDay ? 'active' : ''}`}
+                      onClick={() => setTimePreset('00:00', '23:59')}
+                    >
+                      All Day
                     </button>
-                    <button type="button" className="cal-preset-action" onClick={() => setQuickPreset('2days')}>
-                      Last 2 Days
+                  </div>
+
+                  {/* From / To time dropdowns */}
+                  <div className="time-inputs-grid">
+                    <div className="time-input-box">
+                      <label htmlFor="time-from">From</label>
+                      <select
+                        id="time-from"
+                        className="time-select"
+                        value={startTime}
+                        onChange={e => setStartTime(e.target.value)}
+                      >
+                        {timeOptions.map(t => (
+                          <option key={`from-${t}`} value={t}>{t} IST</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="time-input-box">
+                      <label htmlFor="time-to">To</label>
+                      <select
+                        id="time-to"
+                        className="time-select"
+                        value={endTime}
+                        onChange={e => setEndTime(e.target.value)}
+                      >
+                        {timeOptions.map(t => (
+                          <option key={`to-${t}`} value={t}>{t} IST</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Common Operational Shift Presets */}
+                  <div className="time-presets-row">
+                    <button
+                      type="button"
+                      className={`time-preset-chip ${isMorningShift ? 'active' : ''}`}
+                      onClick={() => setTimePreset('06:00', '14:00')}
+                    >
+                      06:00–14:00 (Shift 1)
                     </button>
                     <button
                       type="button"
-                      className="cal-done-btn"
-                      onClick={() => setCalendarOpen(false)}
+                      className={`time-preset-chip ${isBusinessDay ? 'active' : ''}`}
+                      onClick={() => setTimePreset('09:00', '18:00')}
                     >
-                      Done
+                      09:00–18:00 (Business)
+                    </button>
+                    <button
+                      type="button"
+                      className={`time-preset-chip ${isEveningShift ? 'active' : ''}`}
+                      onClick={() => setTimePreset('14:00', '22:00')}
+                    >
+                      14:00–22:00 (Shift 2)
                     </button>
                   </div>
+                </div>
+
+                {/* 3. Popover Footer */}
+                <div className="cal-footer">
+                  <div className="cal-max-note">
+                    Max date range: <b>2 days</b> at a time
+                  </div>
+                  <button
+                    type="button"
+                    className="cal-done-btn"
+                    onClick={() => setCalendarOpen(false)}
+                  >
+                    Apply Filter
+                  </button>
                 </div>
               </div>
             )}
@@ -494,13 +612,21 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
             {activeDateKeys.map(dayKey => {
               const dayEvents = eventsByDay[dayKey] || eventsByDay['2026-10-31'];
               const dayTrip = tripsByDay[dayKey] || tripsByDay['2026-10-31'];
-              const filteredEvents = dayEvents.filter(e => view !== 'events' || e.at === 38 || e.at === 65);
+
+              // Filter events by selected sub-view (timeline vs events) AND by time window
+              const filteredEvents = dayEvents.filter(e => {
+                const matchesView = view !== 'events' || e.at === 38 || e.at === 65;
+                const inTimeWindow = isAllDay || (e.time >= startTime && e.time <= endTime);
+                return matchesView && inTimeWindow;
+              });
 
               return (
                 <div key={dayKey} className="history-day-group">
                   <div className="history-day-header">
                     <span>{formatDayLabel(dayKey)}</span>
-                    <span className="history-day-sub">Times in IST</span>
+                    <span className="history-day-sub">
+                      {isAllDay ? 'All Day · IST' : `${startTime}–${endTime} IST`}
+                    </span>
                   </div>
 
                   {view === 'trips' ? (
@@ -509,7 +635,7 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
                       <p>{dayTrip.distance} · {dayTrip.area}</p>
                       <button className="co-button" onClick={openPlayback}>Replay trip</button>
                     </div>
-                  ) : (
+                  ) : filteredEvents.length > 0 ? (
                     <div className="history-events">
                       {filteredEvents.map(event => (
                         <button
@@ -520,6 +646,17 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
                           <span>{event.detail} · Select to view on map</span>
                         </button>
                       ))}
+                    </div>
+                  ) : (
+                    <div className="history-empty-window">
+                      <span>No events found between {startTime} and {endTime} IST</span>
+                      <button
+                        type="button"
+                        className="reset-time-link"
+                        onClick={() => setTimePreset('00:00', '23:59')}
+                      >
+                        Reset to All Day
+                      </button>
                     </div>
                   )}
                 </div>
