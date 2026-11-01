@@ -87,7 +87,6 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
               </button>
             ))}
           </div>
-          <span className="history-tz-badge">Trip · Times in IST</span>
         </div>
       )}
 
@@ -127,10 +126,10 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
           </>
         ) : (
           <>
-            <p className="history-caption">31 Oct 2026 · History</p>
+            <p className="history-caption">31 Oct 2026 · History (IST)</p>
             {view === 'trips' ? (
               <div className="history-trip">
-                <b>09:52–10:42 · Trip</b>
+                <b>09:52–10:42 IST · Trip</b>
                 <p>{vehicle.trip} · {vehicle.location}</p>
                 <button className="co-button" onClick={openPlayback}>Replay trip</button>
               </div>
@@ -138,7 +137,7 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
               <div className="history-events">
                 {events.filter(e => view !== 'events' || e.at === 38 || e.at === 65).map(event => (
                   <button key={event.at} onClick={() => { setPlayback(true); setPlaying(false); setProgress(event.at); }}>
-                    <b>{event.time} · {event.label}</b>
+                    <b>{event.time} IST · {event.label}</b>
                     <span>{event.detail} · Select to view on map</span>
                   </button>
                 ))}
