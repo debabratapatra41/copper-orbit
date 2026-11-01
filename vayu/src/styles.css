@@ -136,20 +136,633 @@
 .history-day-group{margin-bottom:16px}
 .history-day-header{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:#57534e;margin-bottom:8px;padding-bottom:4px;border-bottom:1px dashed #e7e5df}
 .history-day-sub{font-size:10.5px;font-weight:500;color:#9c9993}.details-content{flex:1;min-height:0;overflow-y:auto;padding:14px 16px}.sample-note{font-size:14px;color:#856238;background:#fff8e8;border-radius:8px;padding:8px 10px}.detail-section{padding:16px 0;border-bottom:1px solid var(--border)}.detail-section h3{font-size:14px;margin:0 0 8px}.detail-section p{font-size:14px;color:#777;line-height:1.5;margin:4px 0}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.detail-grid span{font-size:14px;color:#888}.detail-grid b{display:block;color:var(--text);font-size:14px;margin-top:3px}.detail-actions{display:flex;gap:7px;margin-top:14px}.history-caption{margin-top:12px!important}.history-events{display:grid;gap:8px;margin-top:10px}.history-events button{display:grid;gap:3px;text-align:left;background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px}.history-events button span{color:#777}.history-events button:hover{border-color:#f3b394}.history-trip{padding:12px;border:1px solid var(--border);border-radius:9px;font-size:14px}.history-trip button{margin-top:8px}
-.playback-sticky-footer{flex-shrink:0;background:#fff;border-top:1px solid var(--border);padding:13px 16px 15px;box-shadow:0 -6px 20px rgba(36,35,33,0.06);position:relative;z-index:30}
-.playback-sticky-footer .playback-title,.playback-title{display:flex;align-items:center;justify-content:space-between}
-.playback-sticky-footer .playback-title h3{font-size:14px;font-weight:700;margin:0;color:var(--text)}
-.playback-sticky-footer .playback-title button,.playback-title button{border:0;background:transparent;color:var(--accent-strong);font-size:13px;font-weight:600;cursor:pointer;padding:2px 0}
-.playback-sticky-footer .playback-title button:hover,.playback-title button:hover{text-decoration:underline;color:var(--accent)}
-.playback-sticky-footer > p{font-size:12px;color:#85827d;margin:2px 0 10px;line-height:1.4}
-.playback-sticky-footer .playback-controls-row,.playback-controls-row{display:flex;align-items:center;justify-content:space-between;margin:8px 0 10px}
-.playback-sticky-footer .playback-play-btn{min-width:68px;min-height:30px;padding:4px 14px;font-size:13px;font-weight:600;border-radius:999px;display:inline-flex;align-items:center;justify-content:center}
-.playback-sticky-footer .playback-controls-row label,.playback-controls-row label{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:550;color:#6f6c66}
-.playback-sticky-footer .playback-controls-row select,.playback-controls-row select{height:30px;padding:0 8px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:12.5px;font-weight:600;color:var(--text);cursor:pointer;outline:none}
-.playback-sticky-footer .playback-controls-row select:focus{border-color:var(--accent)}
-.playback-sticky-footer input[type="range"],.playback-box input{width:100%;height:6px;accent-color:var(--accent);cursor:pointer;margin:6px 0;display:block}
-.playback-sticky-footer .playback-time,.playback-time{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:600;color:#57534e;font-family:var(--font-mono,monospace);margin-top:4px}
-.playback-sticky-footer .playback-time span,.playback-time span{font-size:12px;color:#85827d;font-family:inherit}
+/* Telemetry Sticky Trip Playback Footer */
+.playback-sticky-footer {
+  flex-shrink: 0;
+  background: #ffffff;
+  border-top: 1px solid var(--border);
+  padding: 12px 16px 14px;
+  box-shadow: 0 -8px 24px rgba(36, 35, 33, 0.08);
+  position: relative;
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.playback-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.playback-title-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.playback-title-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.playback-title-badge-group h3 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.telemetry-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fbf3ee;
+  border: 1px solid #f6d1be;
+  color: var(--accent-strong);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1.5px 6.5px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.playback-subtitle {
+  font-size: 11px;
+  color: #88857f;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.playback-exit-btn {
+  border: 0;
+  background: transparent;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.playback-exit-btn:hover {
+  text-decoration: underline;
+  color: var(--accent);
+}
+
+/* 4-Tab Telemetry Metric Switcher */
+.telemetry-metric-switcher {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  background: #f6f5f2;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid #eae8e3;
+}
+
+.metric-tab {
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  transition: all 0.15s ease;
+  min-width: 0;
+  text-align: left;
+}
+
+.metric-tab:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.metric-tab.active {
+  background: #ffffff;
+  border-color: #dfdcce;
+  box-shadow: 0 1px 3px rgba(36, 35, 33, 0.08);
+}
+
+.metric-tab .metric-tab-name {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #726f68;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1;
+}
+
+.metric-tab.active .metric-tab-name {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.metric-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.speed-dot { background: #f36c2d; }
+.gforce-dot { background: #8b5cf6; }
+.accel-dot { background: #059669; }
+
+.metric-tab-val {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: var(--font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.metric-tab-val small {
+  font-size: 9px;
+  font-weight: 500;
+  color: #8b8882;
+}
+
+.metric-tab-val.alert {
+  color: #dc2626;
+}
+
+.metric-tab.metric-all {
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  gap: 5px;
+  color: #6a6760;
+}
+
+.metric-tab.metric-all.active {
+  color: var(--accent-strong);
+}
+
+/* Telemetry Interactive Graph Scrubber Container */
+.telemetry-graph-card {
+  position: relative;
+  height: 94px;
+  width: 100%;
+  background: #faf9f6;
+  border: 1px solid #e7e5df;
+  border-radius: 8px;
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  user-select: none;
+  touch-action: none;
+  box-shadow: inset 0 1px 3px rgba(36, 35, 33, 0.04);
+}
+
+/* Y-Axis Scale Guides */
+.telemetry-y-axis {
+  position: relative;
+  height: 100%;
+  border-right: 1px solid #eeece7;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.telemetry-y-axis .y-label {
+  position: absolute;
+  right: 4px;
+  font-size: 8.5px;
+  font-weight: 600;
+  color: #a8a29e;
+  font-family: var(--font-mono, monospace);
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.telemetry-y-axis .y-label.top { top: 12%; }
+.telemetry-y-axis .y-label.zero { transform: translateY(-50%); color: #78716c; font-weight: 700; }
+.telemetry-y-axis .y-label.btm { top: 88%; }
+.telemetry-y-axis .y-label.alert { color: #dc2626; font-weight: 700; }
+
+/* Inner track area handling pointer scrubbing */
+.telemetry-track-area {
+  position: relative;
+  height: 100%;
+  cursor: crosshair;
+  overflow: visible;
+}
+
+.telemetry-threshold-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  border-top: 1px dashed;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.telemetry-threshold-line span {
+  position: absolute;
+  right: 6px;
+  top: -14px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+
+.speed-limit-line {
+  border-color: rgba(220, 38, 38, 0.4);
+}
+
+.speed-limit-line span {
+  color: #dc2626;
+  background: #fee2e2;
+}
+
+.gforce-limit-line {
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.gforce-limit-line span {
+  color: #7c3aed;
+  background: #ede9fe;
+}
+
+.accel-zero-line {
+  border-color: rgba(168, 162, 158, 0.4);
+}
+
+.accel-zero-line span {
+  color: #78716c;
+  background: #f5f5f4;
+}
+
+.accel-brake-line {
+  border-color: rgba(220, 38, 38, 0.4);
+}
+
+.accel-brake-line span {
+  color: #dc2626;
+  background: #fee2e2;
+}
+
+/* SVG Telemetry Canvas */
+.telemetry-svg-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0 7px 7px 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.incident-svg-pin {
+  cursor: pointer;
+}
+
+/* Hover Guide Line */
+.telemetry-hover-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #78716c;
+  border-left: 1px dashed #78716c;
+  pointer-events: none;
+  z-index: 8;
+  opacity: 0.65;
+}
+
+/* Synchronized Playhead Needle */
+.telemetry-playhead-needle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.telemetry-needle-glow {
+  position: absolute;
+  inset: 0;
+  width: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(243, 108, 45, 0.6);
+}
+
+.telemetry-needle-thumb {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid var(--accent);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: top 0.08s ease-out, border-color 0.15s ease;
+}
+
+/* Synchronized Floating Real-Time HUD Tooltip (Single-line pill) */
+.telemetry-floating-hud {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  background: rgba(36, 35, 33, 0.94);
+  backdrop-filter: blur(6px);
+  color: #ffffff;
+  padding: 3px 8px;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+  z-index: 25;
+  white-space: nowrap;
+  font-size: 10.5px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 0.1s ease;
+}
+
+.telemetry-floating-hud.has-incident {
+  background: #1c1917;
+  border: 1px solid #ef4444;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+}
+
+.hud-time {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: #e7e5e4;
+  font-weight: 600;
+}
+
+.hud-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1.5px 5px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.hud-badge.alert {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.hud-badge.warning {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+.hud-badge.info {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.hud-metric-values {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  color: #d6d3d1;
+}
+
+.hud-metric-values .hud-val.focused {
+  color: #fed7aa;
+  font-weight: 700;
+}
+
+.hud-sep {
+  color: #78716c;
+}
+
+/* Accessible hidden range input overlay */
+.telemetry-accessible-range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  margin: 0;
+  cursor: crosshair;
+  z-index: 12;
+}
+
+/* Quick-Jump Incident Strip */
+.telemetry-incidents-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.incidents-strip-title {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #78716c;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.incidents-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.incidents-pills-row::-webkit-scrollbar {
+  display: none;
+}
+
+.incident-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3.5px;
+  border: 1px solid #e7e5df;
+  background: #faf9f6;
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #57534e;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.incident-pill:hover {
+  background: #f0eee9;
+  border-color: #d6d3cc;
+}
+
+.incident-pill.active {
+  background: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(243, 108, 45, 0.25);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.incident-pill.alert {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.incident-pill.alert:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
+}
+
+.incident-pill.alert.active {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
+}
+
+.incident-pill.warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.incident-pill.warning:hover {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.incident-icon {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.incident-time {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  color: #78716c;
+}
+
+.incident-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 0 3.5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* Bottom Transport Controls & Time Readout */
+.playback-footer-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 1px;
+}
+
+.playback-transport-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.playback-footer-controls .playback-play-btn {
+  min-width: 74px;
+  min-height: 30px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: var(--accent);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.playback-footer-controls .playback-play-btn:hover {
+  background: var(--accent-strong);
+}
+
+.playback-speed-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6f6c66;
+}
+
+.playback-speed-label select {
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+}
+
+.playback-speed-label select:focus {
+  border-color: var(--accent);
+}
+
+.playback-time-cluster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono, monospace);
+}
+
+.playback-clock {
+  font-size: 12px;
+  font-weight: 700;
+  color: #44403c;
+}
+
+.playback-progress-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-strong);
+  background: #fbf3ee;
+  border: 1px solid #f6d1be;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
 @media(max-width:760px){.vehicle-details{position:fixed;top:auto;bottom:0;right:0;width:100%;height:min(70vh,600px);border-radius:14px 14px 0 0;z-index:1200}}
 
 /* Compact fleet cards */
@@ -271,3 +884,1068 @@
 .has-active-vehicle .fleet-map-marker.is-active-vehicle .moving-marker-body{box-shadow:0 0 0 3px #fff,0 0 0 5px var(--accent)!important}
 .has-active-vehicle .marker-cluster{opacity:.35!important;transition:opacity .22s ease}
 .has-active-vehicle .marker-cluster:hover{opacity:.9!important}
+
+/* ==========================================================================
+   Dashcam & Movement Telematics Inspector
+   ========================================================================== */
+
+/* Enable clicks inside Leaflet tooltip */
+.dashcam-tooltip-wrap,
+.dashcam-tooltip-wrap * {
+  pointer-events: auto !important;
+}
+.dashcam-tooltip-wrap.leaflet-tooltip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+.dashcam-tooltip-wrap:before {
+  display: none !important;
+}
+
+/* Card Container */
+.dashcam-hover-card {
+  width: 360px;
+  max-width: min(360px, calc(100vw - 32px));
+  background: rgba(18, 21, 28, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  box-shadow: 0 20px 48px -10px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  color: #f3f4f6;
+  overflow: hidden;
+  font-family: Inter, system-ui, sans-serif;
+  user-select: none;
+  animation: dashcamCardFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center bottom;
+  text-align: left;
+}
+
+@keyframes dashcamCardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Card Header */
+.dashcam-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(12, 14, 18, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dashcam-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rec-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #ef4444;
+  font-family: var(--font-mono, monospace);
+}
+.rec-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+  animation: recBlink 1.4s ease-in-out infinite;
+}
+@keyframes recBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.25; transform: scale(0.85); }
+}
+
+.cam-selector-pill {
+  display: flex;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+.cam-pill-btn {
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cam-pill-btn:hover {
+  color: #fff;
+}
+.cam-pill-btn.active {
+  background: var(--accent, #f36c2d);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(243, 108, 45, 0.4);
+}
+
+.dashcam-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dashcam-time-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  font-family: var(--font-mono, monospace);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.dashcam-icon-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: #d1d5db;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+}
+.dashcam-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.dashcam-icon-btn.active {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+.dashcam-icon-btn.highlight:hover {
+  background: var(--accent, #f36c2d);
+  border-color: var(--accent, #f36c2d);
+  color: #fff;
+}
+
+/* 16:9 Viewport */
+.dashcam-viewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden;
+  cursor: pointer;
+}
+.dashcam-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.4s ease;
+}
+.dashcam-img.loaded {
+  opacity: 1;
+}
+.dashcam-viewport:hover .dashcam-img {
+  transform: scale(1.02);
+}
+.dashcam-lens-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 65%, rgba(0, 0, 0, 0.55) 100%);
+  pointer-events: none;
+}
+
+/* OSD Overlays */
+.dashcam-osd {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  font-family: var(--font-mono, "SF Mono", Consolas, monospace);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #e5e7eb;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  z-index: 10;
+}
+.osd-top {
+  top: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.75) 0%, transparent 100%);
+}
+.osd-bottom {
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.85) 0%, transparent 100%);
+}
+.osd-telemetry b {
+  color: #34d399;
+}
+
+/* AI Detection Overlays */
+.dashcam-ai-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+}
+.ai-bounding-box {
+  position: absolute;
+  border: 1.5px solid #10b981;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.1);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.35);
+  animation: aiPulse 2.5s ease-in-out infinite;
+}
+@keyframes aiPulse {
+  0%, 100% {
+    border-color: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+  }
+  50% {
+    border-color: #34d399;
+    box-shadow: 0 0 14px rgba(52, 211, 153, 0.55);
+  }
+}
+.ai-box-tag {
+  position: absolute;
+  bottom: 100%;
+  left: -1px;
+  background: #10b981;
+  color: #064e3b;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px 3px 0 0;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.ai-lane-guide {
+  position: absolute;
+  bottom: 0;
+  width: 2px;
+  height: 48%;
+  background: repeating-linear-gradient(to top, #06b6d4, #06b6d4 4px, transparent 4px, transparent 8px);
+  opacity: 0.65;
+}
+.ai-lane-guide.left-lane {
+  left: 24%;
+  transform: rotate(18deg);
+  transform-origin: bottom center;
+}
+.ai-lane-guide.right-lane {
+  right: 24%;
+  transform: rotate(-18deg);
+  transform-origin: bottom center;
+}
+.ai-driver-box {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+}
+.ai-driver-tag {
+  background: rgba(16, 185, 129, 0.25);
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  color: #34d399;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  backdrop-filter: blur(8px);
+}
+
+.dashcam-expand-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  backdrop-filter: blur(3px);
+  z-index: 12;
+}
+.dashcam-viewport:hover .dashcam-expand-hint {
+  opacity: 1;
+}
+
+/* Motion Banner */
+.dashcam-motion-banner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-top: 1px solid;
+  border-bottom: 1px solid;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.motion-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.motion-status-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.motion-progress-badge {
+  font-size: 10.5px;
+  color: #9ca3af;
+  font-family: var(--font-mono, monospace);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Telemetry Grid */
+.dashcam-telemetry-grid {
+  display: grid;
+  grid-template-columns: 1fr 100px 1fr;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.telemetry-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.telemetry-cell-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.telemetry-cell-val {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #fff;
+  font-family: var(--font-mono, Inter, monospace);
+}
+.telemetry-cell-val small {
+  font-size: 11px;
+  font-weight: 500;
+  color: #9ca3af;
+  margin-left: 2px;
+}
+.telemetry-cell-sub {
+  font-size: 10.5px;
+  color: #9ca3af;
+  line-height: 1.3;
+}
+.telemetry-cell-sub.safe {
+  color: #34d399;
+}
+.telemetry-cell-sub.danger {
+  color: #f87171;
+  font-weight: 600;
+}
+
+/* 2D IMU G-Force Crosshair Meter */
+.imu-gforce-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 2px;
+}
+.imu-grid {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.imu-axis {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.1);
+}
+.imu-axis.x-axis {
+  left: 0; right: 0; top: 50%; height: 1px; transform: translateY(-50%);
+}
+.imu-axis.y-axis {
+  top: 0; bottom: 0; left: 50%; width: 1px; transform: translateX(-50%);
+}
+.imu-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+}
+.imu-ring.r-outer {
+  inset: 4px;
+}
+.imu-ring.r-inner {
+  inset: 12px;
+}
+.imu-dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 6px #34d399;
+  transform: translate(-50%, -50%);
+  transition: all 0.12s ease-out;
+}
+.imu-dot.med-g {
+  background: #fbbf24;
+  box-shadow: 0 0 6px #fbbf24;
+}
+.imu-dot.high-g {
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+}
+.imu-label {
+  display: flex;
+  flex-direction: column;
+}
+.imu-label b {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  font-family: var(--font-mono, monospace);
+}
+.imu-label small {
+  font-size: 9.5px;
+  color: #9ca3af;
+  font-family: var(--font-mono, monospace);
+}
+
+/* Sensor Pills */
+.dashcam-sensor-pills {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.sensor-pill {
+  font-size: 10.5px;
+  color: #9ca3af;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sensor-pill small {
+  font-size: 9px;
+  text-transform: uppercase;
+  color: #6b7280;
+  letter-spacing: 0.04em;
+}
+.sensor-pill b {
+  color: #e5e7eb;
+  font-size: 11.5px;
+  font-family: var(--font-mono, monospace);
+}
+
+/* Location Row */
+.dashcam-location-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 11.5px;
+  color: #d1d5db;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.loc-icon {
+  color: var(--accent, #f36c2d);
+  flex-shrink: 0;
+}
+.loc-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Footer Actions */
+.dashcam-card-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 9px 12px;
+  background: rgba(12, 14, 18, 0.95);
+}
+.jump-replay-btn {
+  border: 1px solid rgba(243, 108, 45, 0.4);
+  background: rgba(243, 108, 45, 0.15);
+  color: #ff9158;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.jump-replay-btn:hover {
+  background: var(--accent, #f36c2d);
+  color: #fff;
+  border-color: var(--accent, #f36c2d);
+  box-shadow: 0 2px 8px rgba(243, 108, 45, 0.4);
+}
+.studio-btn {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f3f4f6;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.studio-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ==========================================================================
+   Full HD Dashcam Studio Modal
+   ========================================================================== */
+
+.dashcam-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(10, 12, 16, 0.82);
+  backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: modalFadeIn 0.2s ease-out;
+}
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.dashcam-studio-window {
+  width: min(1040px, 96vw);
+  max-height: 92vh;
+  background: #12141a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  box-shadow: 0 32px 72px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #f3f4f6;
+  animation: studioSlideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes studioSlideUp {
+  from { transform: translateY(16px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.studio-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 24px 14px;
+  background: #161922;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.studio-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent, #f36c2d);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.studio-title-group h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+.studio-title-group p {
+  font-size: 13px;
+  color: #9ca3af;
+  margin: 0;
+}
+.studio-title-group p b {
+  color: #e5e7eb;
+}
+.studio-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.studio-rec-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 4px 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono, monospace);
+}
+.studio-rec-pill .rec-dot {
+  background: #34d399;
+  box-shadow: 0 0 6px #34d399;
+}
+.studio-btn-subtle {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f3f4f6;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.studio-btn-subtle:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.studio-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: #9ca3af;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.studio-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.studio-toast {
+  background: #10b981;
+  color: #064e3b;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 8px 16px;
+  text-align: center;
+  animation: toastSlide 0.2s ease-out;
+}
+@keyframes toastSlide {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+.studio-screen-wrap {
+  position: relative;
+  width: 100%;
+  background: #000;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.studio-main-screen {
+  position: relative;
+  width: 100%;
+  max-height: 520px;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden;
+}
+.studio-primary-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.studio-osd {
+  padding: 8px 16px;
+  font-size: 12px;
+}
+.studio-box {
+  border-width: 2px;
+}
+.studio-box .ai-box-tag {
+  font-size: 11px;
+  padding: 2px 7px;
+}
+.studio-driver-box {
+  top: 20px;
+  left: 20px;
+}
+.studio-driver-tag {
+  font-size: 12px;
+  padding: 5px 12px;
+}
+
+/* Picture-in-Picture (PiP) Window */
+.studio-pip-window {
+  position: absolute;
+  right: 18px;
+  bottom: 38px;
+  width: 190px;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+  z-index: 25;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.studio-pip-window:hover {
+  transform: scale(1.05);
+  border-color: var(--accent, #f36c2d);
+  box-shadow: 0 16px 36px rgba(243, 108, 45, 0.35);
+}
+.studio-pip-window img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pip-label {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 50%, rgba(0, 0, 0, 0.85) 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 6px 8px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.pip-label small {
+  color: var(--accent, #f36c2d);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+/* Studio Bottom Telemetry & Controls */
+.studio-telemetry-panel {
+  padding: 16px 24px 20px;
+  background: #161922;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.studio-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.playback-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.studio-play-btn {
+  border: none;
+  background: var(--accent, #f36c2d);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 2px 8px rgba(243, 108, 45, 0.4);
+}
+.studio-play-btn:hover {
+  background: #d9551d;
+}
+.studio-restart-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #d1d5db;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.studio-restart-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+.studio-speed-select {
+  font-size: 12px;
+  color: #9ca3af;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 4px;
+}
+.studio-speed-select select {
+  background: #1e222d;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.studio-toggle-chip {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.studio-toggle-chip:hover {
+  color: #fff;
+}
+.studio-toggle-chip.active {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+.studio-telemetry-pills {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.telemetry-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #9ca3af;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 5px 9px;
+  border-radius: 6px;
+}
+.telemetry-pill b {
+  color: #fff;
+  font-family: var(--font-mono, monospace);
+}
+.telemetry-pill small {
+  color: #6b7280;
+}
+.studio-sync-map-btn {
+  border: 1px solid var(--accent, #f36c2d);
+  background: rgba(243, 108, 45, 0.15);
+  color: #ff9158;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.studio-sync-map-btn:hover {
+  background: var(--accent, #f36c2d);
+  color: #fff;
+}
+
+/* Scrubber Slider */
+.studio-scrubber-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.studio-slider {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  accent-color: var(--accent, #f36c2d);
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+.studio-milestones-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.milestone-chip {
+  flex: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #9ca3af;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.milestone-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.milestone-chip.active {
+  background: rgba(243, 108, 45, 0.2);
+  border-color: rgba(243, 108, 45, 0.5);
+  color: #ff9158;
+  font-weight: 700;
+}
+.milestone-chip b {
+  font-family: var(--font-mono, monospace);
+  margin-right: 3px;
+  color: #d1d5db;
+}
+
+/* Scrubber Preview Tooltip */
+.scrubber-dashcam-preview {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  transform: translateX(-50%);
+  width: 140px;
+  background: #12141a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 100;
+}
+.scrubber-preview-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+}
+.scrubber-preview-meta {
+  padding: 4px 6px;
+  background: #181b24;
+  font-size: 10px;
+  display: flex;
+  justify-content: space-between;
+  color: #9ca3af;
+  font-family: var(--font-mono, monospace);
+}
+.scrubber-preview-meta b {
+  color: #fff;
+}
+
+/* Event List Camera Badge */
+.event-cam-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-strong, #d9551d);
+  background: var(--accent-soft, #fff0e8);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+/* HUD Dashcam Preview inside Timeline */
+.hud-dashcam-thumb-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 5px 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.hud-dashcam-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.hud-dashcam-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: rgba(18, 21, 28, 0.75);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  letter-spacing: 0.03em;
+}
