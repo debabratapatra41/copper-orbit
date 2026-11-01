@@ -265,9 +265,9 @@
 .map-canvas .leaflet-control-attribution{background:#fffffff0;border-radius:6px 0 0 0;padding:3px 7px;color:#5f5d58}
 
 /* Focus vehicle mode: dim non-selected vehicles when details/timeline is active */
-.has-active-vehicle .fleet-map-marker{opacity:.28;filter:grayscale(.35);transition:opacity .22s cubic-bezier(0.16,1,0.3,1),filter .22s ease}
-.has-active-vehicle .fleet-map-marker:hover{opacity:.88;filter:none;z-index:500!important}
+.has-active-vehicle .fleet-map-marker:not(.is-active-vehicle){opacity:.25!important;filter:grayscale(.4)!important;transition:opacity .22s cubic-bezier(0.16,1,0.3,1),filter .22s ease}
+.has-active-vehicle .fleet-map-marker:not(.is-active-vehicle):hover{opacity:.88!important;filter:none!important;z-index:500!important}
 .has-active-vehicle .fleet-map-marker.is-active-vehicle{opacity:1!important;filter:none!important;z-index:1000!important}
-.has-active-vehicle .fleet-map-marker.is-active-vehicle .moving-marker-body{box-shadow:0 0 0 3px #fff,0 0 0 5px var(--accent)}
-.has-active-vehicle .marker-cluster{opacity:.32;transition:opacity .22s ease}
-.has-active-vehicle .marker-cluster:hover{opacity:.9}
+.has-active-vehicle .fleet-map-marker.is-active-vehicle .moving-marker-body{box-shadow:0 0 0 3px #fff,0 0 0 5px var(--accent)!important}
+.has-active-vehicle .marker-cluster{opacity:.35!important;transition:opacity .22s ease}
+.has-active-vehicle .marker-cluster:hover{opacity:.9!important}

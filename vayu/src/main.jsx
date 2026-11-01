@@ -82,7 +82,7 @@ function ClusteredVehicles({ vehicles: items, onSelect, activeId }) {
       );
       const marker = L.marker(vehicle.position, {
         icon: L.divIcon({
-          className: `fleet-map-marker ${isSelected ? 'is-active-vehicle' : ''}`,
+          className: `fleet-map-marker marker-id-${vehicle.id} ${isSelected ? 'is-active-vehicle' : ''}`,
           html: markerHtml,
           iconSize: [30, 30],
           iconAnchor: [15, 15]
@@ -309,7 +309,47 @@ function VayuBasemap() {
 
 function FleetMap({ visibleVehicles, selectedId, onSelect, locateTarget, detailVehicle, playback, progress }) {
   const activeId = detailVehicle?.id;
-  return <div className="map-panel"><div className={`map-canvas ${activeId ? 'has-active-vehicle' : ''}`}><MapContainer center={[20, 0]} zoom={2} minZoom={2} maxZoom={17} zoomControl={false} attributionControl scrollWheelZoom><VayuBasemap /><MapResizeObserver /><ClusteredVehicles vehicles={visibleVehicles} onSelect={onSelect} activeId={activeId} /><PlaybackMap vehicle={detailVehicle} active={playback} progress={progress} /><LocateVehicle target={locateTarget} detailVehicle={detailVehicle} playback={playback} /><MapControls /></MapContainer></div></div>;
+  return (
+    <div className="map-panel">
+      <div className={`map-canvas ${activeId ? 'has-active-vehicle' : ''}`}>
+        {activeId && (
+          <style>{`
+            .has-active-vehicle .fleet-map-marker:not(.marker-id-${activeId}) {
+              opacity: 0.25 !important;
+              filter: grayscale(0.4) !important;
+            }
+            .has-active-vehicle .fleet-map-marker:not(.marker-id-${activeId}):hover {
+              opacity: 0.88 !important;
+              filter: none !important;
+              z-index: 500 !important;
+            }
+            .has-active-vehicle .fleet-map-marker.marker-id-${activeId} {
+              opacity: 1 !important;
+              filter: none !important;
+              z-index: 1000 !important;
+            }
+            .has-active-vehicle .fleet-map-marker.marker-id-${activeId} .moving-marker-body {
+              box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--accent) !important;
+            }
+            .has-active-vehicle .marker-cluster {
+              opacity: 0.35 !important;
+            }
+            .has-active-vehicle .marker-cluster:hover {
+              opacity: 0.9 !important;
+            }
+          `}</style>
+        )}
+        <MapContainer center={[20, 0]} zoom={2} minZoom={2} maxZoom={17} zoomControl={false} attributionControl scrollWheelZoom>
+          <VayuBasemap />
+          <MapResizeObserver />
+          <ClusteredVehicles vehicles={visibleVehicles} onSelect={onSelect} activeId={activeId} />
+          <PlaybackMap vehicle={detailVehicle} active={playback} progress={progress} />
+          <LocateVehicle target={locateTarget} detailVehicle={detailVehicle} playback={playback} />
+          <MapControls />
+        </MapContainer>
+      </div>
+    </div>
+  );
 }
 
 function LocationFilter({ location, onChange }) {
