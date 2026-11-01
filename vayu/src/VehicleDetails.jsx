@@ -1,6 +1,27 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CircleMarker, Polyline, useMap } from 'react-leaflet';
+import { CircleMarker, Polyline, Tooltip, useMap } from 'react-leaflet';
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight, Clock, Gauge, History, X } from 'lucide-react';
+
+function getDrawerOffset() {
+  const drawerEl = typeof document !== 'undefined' ? document.querySelector('.vehicle-details') : null;
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 760;
+  if (isMobile) {
+    const drawerH = drawerEl ? drawerEl.offsetHeight : 340;
+    return {
+      paddingTopLeft: [24, 24],
+      paddingBottomRight: [24, Math.round(drawerH) + 24],
+      isMobile: true,
+      drawerSize: drawerH
+    };
+  }
+  const drawerW = drawerEl ? drawerEl.offsetWidth : 440;
+  return {
+    paddingTopLeft: [48, 48],
+    paddingBottomRight: [Math.round(drawerW) + 48, 48],
+    isMobile: false,
+    drawerSize: drawerW
+  };
+}
 
 export function PlaybackMap({ vehicle, progress, active }) {
   const map = useMap();
@@ -16,27 +37,110 @@ export function PlaybackMap({ vehicle, progress, active }) {
     ];
   }, [vehicle]);
 
+  // Fit the whole route into the unobstructed visible viewport (avoiding drawer)
   useEffect(() => {
-    if (active && points.length) map.fitBounds(points, { padding: [70, 70], maxZoom: 14 });
+    if (!active || !points.length) return;
+
+    const fit = () => {
+      const { paddingTopLeft, paddingBottomRight } = getDrawerOffset();
+      map.fitBounds(points, {
+        paddingTopLeft,
+        paddingBottomRight,
+        maxZoom: 15
+      });
+    };
+
+    fit();
+    const timer = setTimeout(fit, 120);
+    return () => clearTimeout(timer);
   }, [active, map, points]);
 
-  if (!active || !points.length) return null;
-  const scaled = (progress / 100) * (points.length - 1);
-  const index = Math.min(Math.floor(scaled), points.length - 2);
-  const t = scaled - index;
-  const point = [
-    points[index][0] + (points[index + 1][0] - points[index][0]) * t,
-    points[index][1] + (points[index + 1][1] - points[index][1]) * t
-  ];
+  // Interpolate vehicle position along the route
+  const point = useMemo(() => {
+    if (!points.length) return null;
+    const scaled = (progress / 100) * (points.length - 1);
+    const index = Math.min(Math.floor(scaled), points.length - 2);
+    const t = scaled - index;
+    return [
+      points[index][0] + (points[index + 1][0] - points[index][0]) * t,
+      points[index][1] + (points[index + 1][1] - points[index][1]) * t
+    ];
+  }, [points, progress]);
+
+  // Keep moving vehicle inside the visible viewport during replay
+  useEffect(() => {
+    if (!active || !point || !points.length) return;
+    if (!map || typeof map.getSize !== 'function') return;
+
+    const mapSize = map.getSize();
+    if (!mapSize || mapSize.x <= 0 || mapSize.y <= 0) return;
+
+    const { isMobile, drawerSize } = getDrawerOffset();
+
+    // Define safe visible area to the left of (or above) the vehicle details drawer
+    const safeMinX = 40;
+    const safeMaxX = isMobile ? mapSize.x - 40 : Math.max(safeMinX + 100, mapSize.x - drawerSize - 32);
+    const safeMinY = 40;
+    const safeMaxY = isMobile ? Math.max(safeMinY + 100, mapSize.y - drawerSize - 24) : mapSize.y - 40;
+
+    const containerPt = map.latLngToContainerPoint(point);
+
+    const isOutsideSafeView = (
+      containerPt.x < safeMinX ||
+      containerPt.x > safeMaxX ||
+      containerPt.y < safeMinY ||
+      containerPt.y > safeMaxY
+    );
+
+    if (isOutsideSafeView) {
+      const desiredX = (safeMinX + safeMaxX) / 2;
+      const desiredY = (safeMinY + safeMaxY) / 2;
+      const dx = (mapSize.x / 2) - desiredX;
+      const dy = (mapSize.y / 2) - desiredY;
+
+      const currentZoom = map.getZoom();
+      const pointPixel = map.project(point, currentZoom);
+      const targetCenterPixel = pointPixel.add([dx, dy]);
+      const targetCenterLatLng = map.unproject(targetCenterPixel, currentZoom);
+
+      map.panTo(targetCenterLatLng, { animate: true, duration: 0.28 });
+    }
+  }, [active, point, map, points.length]);
+
+  if (!active || !points.length || !point) return null;
 
   return (
     <>
       <Polyline positions={points} pathOptions={{ color: '#f36c2d', weight: 4 }} />
+      {/* Start and end depot/destination markers */}
+      <CircleMarker
+        center={points[0]}
+        radius={4}
+        pathOptions={{ color: '#85827d', weight: 2, fillColor: '#fff', fillOpacity: 1 }}
+      />
+      <CircleMarker
+        center={points[points.length - 1]}
+        radius={4}
+        pathOptions={{ color: '#d9551d', weight: 2, fillColor: '#fff', fillOpacity: 1 }}
+      />
+      {/* Replay vehicle halo */}
       <CircleMarker
         center={point}
-        radius={9}
-        pathOptions={{ color: '#fff', weight: 3, fillColor: '#25734a', fillOpacity: 1 }}
+        radius={14}
+        pathOptions={{ color: '#f36c2d', weight: 1.5, fillColor: '#f36c2d', fillOpacity: 0.2 }}
       />
+      {/* Replay vehicle core */}
+      <CircleMarker
+        center={point}
+        radius={8}
+        pathOptions={{ color: '#fff', weight: 2.5, fillColor: '#25734a', fillOpacity: 1 }}
+      >
+        <Tooltip permanent direction="top" offset={[0, -10]} opacity={0.95}>
+          <span style={{ fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' }}>
+            {vehicle.id} · {progress}%
+          </span>
+        </Tooltip>
+      </CircleMarker>
     </>
   );
 }
