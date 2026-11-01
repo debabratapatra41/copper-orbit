@@ -422,7 +422,9 @@ export function DashcamHoverCard({
   onSeek,
   onOpenStudio,
   onClose,
-  isPinned = false
+  isPinned = false,
+  onMouseEnter,
+  onMouseLeave
 }) {
   const [camView, setCamView] = useState('front'); // 'front' | 'cabin'
   const [showAiVision, setShowAiVision] = useState(true);
@@ -449,6 +451,8 @@ export function DashcamHoverCard({
       role="region"
       aria-label={`Dashcam & Telemetry inspection for ${vehicle?.id || 'vehicle'} at ${timeStr} IST`}
       onClick={e => e.stopPropagation()}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       {/* Top Header Bar */}
       <div className="dashcam-card-header">

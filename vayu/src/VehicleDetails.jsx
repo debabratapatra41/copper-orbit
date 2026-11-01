@@ -356,6 +356,10 @@ export function PlaybackMap({ vehicle, progress, active, setProgress, setPlaybac
                 onOpenStudio={p => setStudioProgress(p)}
                 onClose={() => setHoveredState(null)}
                 isPinned={hoveredState.isPinned}
+                onMouseEnter={() => {
+                  if (hoverLeaveTimerRef.current) clearTimeout(hoverLeaveTimerRef.current);
+                }}
+                onMouseLeave={handleRouteMouseOut}
               />
             </Tooltip>
           </CircleMarker>
@@ -563,6 +567,14 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
   else activeThumbY = speedToY(currentTelemetry.speed);
   const thumbYPct = Math.round((activeThumbY / 140) * 100);
 
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
   // Graph drag & scrub handlers
   const updateProgressFromEvent = useCallback((e) => {
     if (!graphRef.current) return;
@@ -591,7 +603,10 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
     if (isDragging) {
       setProgress(pct);
     } else {
-      setHoverProgress(pct);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        setHoverProgress(prev => (prev === pct ? prev : pct));
+      });
     }
   }, [isDragging, setProgress]);
 
@@ -605,6 +620,7 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
   }, [isDragging]);
 
   const handleGraphPointerLeave = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
     if (!isDragging) {
       setHoverProgress(null);
     }
@@ -1382,10 +1398,14 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
                   return (
                     <g key={inc.progress} className="incident-svg-pin">
                       {isCurrent && (
-                        <circle cx={cx} cy={cy} r="10" fill={inc.event.severity === 'alert' ? '#ef4444' : '#f36c2d'} opacity="0.3">
-                          <animate attributeName="r" values="8;14;8" dur="1.5s" repeatCount="indefinite" />
-                          <animate attributeName="opacity" values="0.4;0.1;0.4" dur="1.5s" repeatCount="indefinite" />
-                        </circle>
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r="9"
+                          fill={inc.event.severity === 'alert' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(243, 108, 45, 0.25)'}
+                          stroke={inc.event.severity === 'alert' ? '#ef4444' : '#f36c2d'}
+                          strokeWidth="1"
+                        />
                       )}
                       <circle
                         cx={cx}
@@ -1424,40 +1444,42 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
                 />
               </div>
 
-              {/* Synchronized Real-Time HUD Badge (Single-line pill) */}
-              <div
-                className={`telemetry-floating-hud ${displayTelemetry.event ? 'has-incident' : ''}`}
-                style={{
-                  left: `${hoverProgress !== null ? hoverProgress : progress}%`,
-                  transform: `translateX(${
-                    (hoverProgress !== null ? hoverProgress : progress) <= 24
-                      ? '0%'
-                      : (hoverProgress !== null ? hoverProgress : progress) >= 68
-                      ? '-100%'
-                      : '-50%'
-                  })`
-                }}
-              >
-                <span className="hud-time">{displayTelemetry.timeStr}</span>
-                {displayTelemetry.event && (
-                  <span className={`hud-badge ${displayTelemetry.event.severity}`}>
-                    {displayTelemetry.event.icon} {displayTelemetry.event.label}
+              {/* Synchronized Real-Time HUD Badge (Single-line pill on hover / scrub) */}
+              {(hoverProgress !== null || isDragging) && (
+                <div
+                  className={`telemetry-floating-hud ${displayTelemetry.event ? 'has-incident' : ''}`}
+                  style={{
+                    left: `${hoverProgress !== null ? hoverProgress : progress}%`,
+                    transform: `translateX(${
+                      (hoverProgress !== null ? hoverProgress : progress) <= 24
+                        ? '0%'
+                        : (hoverProgress !== null ? hoverProgress : progress) >= 68
+                        ? '-100%'
+                        : '-50%'
+                    })`
+                  }}
+                >
+                  <span className="hud-time">{displayTelemetry.timeStr}</span>
+                  {displayTelemetry.event && (
+                    <span className={`hud-badge ${displayTelemetry.event.severity}`}>
+                      {displayTelemetry.event.icon} {displayTelemetry.event.label}
+                    </span>
+                  )}
+                  <span className="hud-metric-values">
+                    <span className={`hud-val ${telemetryMetric === 'speed' ? 'focused' : ''}`}>
+                      {displayTelemetry.speed} km/h
+                    </span>
+                    <span className="hud-sep">·</span>
+                    <span className={`hud-val ${telemetryMetric === 'gforce' ? 'focused' : ''}`}>
+                      {displayTelemetry.gForce.toFixed(2)} g
+                    </span>
+                    <span className="hud-sep">·</span>
+                    <span className={`hud-val ${telemetryMetric === 'accel' ? 'focused' : ''}`}>
+                      {displayTelemetry.accel > 0 ? `+${displayTelemetry.accel.toFixed(1)}` : displayTelemetry.accel.toFixed(1)} m/s²
+                    </span>
                   </span>
-                )}
-                <span className="hud-metric-values">
-                  <span className={`hud-val ${telemetryMetric === 'speed' ? 'focused' : ''}`}>
-                    {displayTelemetry.speed} km/h
-                  </span>
-                  <span className="hud-sep">·</span>
-                  <span className={`hud-val ${telemetryMetric === 'gforce' ? 'focused' : ''}`}>
-                    {displayTelemetry.gForce.toFixed(2)} g
-                  </span>
-                  <span className="hud-sep">·</span>
-                  <span className={`hud-val ${telemetryMetric === 'accel' ? 'focused' : ''}`}>
-                    {displayTelemetry.accel > 0 ? `+${displayTelemetry.accel.toFixed(1)}` : displayTelemetry.accel.toFixed(1)} m/s²
-                  </span>
-                </span>
-              </div>
+                </div>
+              )}
 
               {/* Accessible screen-reader & keyboard input overlay */}
               <input
