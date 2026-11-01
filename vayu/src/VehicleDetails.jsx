@@ -662,25 +662,47 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
                 </div>
               );
             })}
-
-            {playback && (
-              <div className="detail-section playback-box">
-                <div className="playback-title">
-                  <h3>Trip playback</h3>
-                  <button onClick={() => { setPlayback(false); setPlaying(false); }}>Exit replay</button>
-                </div>
-                <p>Route based on demonstration data</p>
-                <div className="playback-controls-row">
-                  <button className="co-button" onClick={() => { if (progress === 100) setProgress(0); setPlaying(!playing); }}>{playing ? 'Pause' : 'Play'}</button>
-                  <label>Speed <select aria-label="Playback speed" value={speed} onChange={e => setSpeed(Number(e.target.value))}><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
-                </div>
-                <input type="range" min="0" max="100" aria-label="Trip playback position" aria-valuetext={`${time} IST`} value={progress} onChange={e => { setPlaying(false); setProgress(Number(e.target.value)); }}/>
-                <div className="playback-time">{time} IST <span>{progress}%</span></div>
-              </div>
-            )}
           </>
         )}
       </div>
+
+      {/* Sticky Bottom Trip Playback Bar */}
+      {playback && (
+        <div className="playback-sticky-footer" role="region" aria-label="Trip playback controls">
+          <div className="playback-title">
+            <h3>Trip playback</h3>
+            <button type="button" onClick={() => { setPlayback(false); setPlaying(false); }}>Exit replay</button>
+          </div>
+          <p>Route based on demonstration data</p>
+          <div className="playback-controls-row">
+            <button
+              type="button"
+              className="co-button playback-play-btn"
+              onClick={() => { if (progress === 100) setProgress(0); setPlaying(!playing); }}
+            >
+              {playing ? 'Pause' : 'Play'}
+            </button>
+            <label>
+              Speed{' '}
+              <select aria-label="Playback speed" value={speed} onChange={e => setSpeed(Number(e.target.value))}>
+                <option value="1">1×</option>
+                <option value="2">2×</option>
+                <option value="4">4×</option>
+              </select>
+            </label>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            aria-label="Trip playback position"
+            aria-valuetext={`${time} IST`}
+            value={progress}
+            onChange={e => { setPlaying(false); setProgress(Number(e.target.value)); }}
+          />
+          <div className="playback-time">{time} IST <span>{progress}%</span></div>
+        </div>
+      )}
     </aside>
   );
 }
