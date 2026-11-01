@@ -263,3 +263,11 @@
 .moving-marker-label{top:36px;padding:5px 8px;border-color:#e7e5e1;border-radius:8px;background:#fff;color:#4c4a46;box-shadow:0 3px 10px #2423211c;font:12px/1.3 Inter,system-ui,sans-serif}
 .moving-marker-label b{color:#242321}
 .map-canvas .leaflet-control-attribution{background:#fffffff0;border-radius:6px 0 0 0;padding:3px 7px;color:#5f5d58}
+
+/* Focus vehicle mode: dim non-selected vehicles when details/timeline is active */
+.has-active-vehicle .fleet-map-marker{opacity:.28;filter:grayscale(.35);transition:opacity .22s cubic-bezier(0.16,1,0.3,1),filter .22s ease}
+.has-active-vehicle .fleet-map-marker:hover{opacity:.88;filter:none;z-index:500!important}
+.has-active-vehicle .fleet-map-marker.is-active-vehicle{opacity:1!important;filter:none!important;z-index:1000!important}
+.has-active-vehicle .fleet-map-marker.is-active-vehicle .moving-marker-body{box-shadow:0 0 0 3px #fff,0 0 0 5px var(--accent)}
+.has-active-vehicle .marker-cluster{opacity:.32;transition:opacity .22s ease}
+.has-active-vehicle .marker-cluster:hover{opacity:.9}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import L from 'leaflet';
@@ -53,24 +53,89 @@ const vehicles = Array.from({length: 3000}, (_, index) => {
   return {...seed, status: offline ? 'alert' : seed.status, fuel: kind === 'energy' ? '18%' : seed.fuel, updated, driver: `${firstNames[driverIndex % firstNames.length]} ${lastNames[Math.floor(driverIndex / firstNames.length)]}`, updatedAt: new Date(sampleTime - (parseInt(updated, 10) || 0) * 60000), id: `VY-${String(index + 1001).padStart(4,'0')}`, location: hub[2], sampleContext: scenarios[kind], position: [hub[0] + Math.sin(n * 12.989 + index) * (0.04 + (n % 10) * 0.025), hub[1] + Math.cos(n * 7.31 + index) * (0.04 + (n % 10) * 0.025)]};
 });
 
-function ClusteredVehicles({vehicles: items, onSelect}) {
+function ClusteredVehicles({ vehicles: items, onSelect, activeId }) {
   const map = useMap();
+  const markerMapRef = useRef(new Map());
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
+
   useEffect(() => {
-    const cluster = L.markerClusterGroup({maxClusterRadius: 55, chunkedLoading: true});
+    const cluster = L.markerClusterGroup({ maxClusterRadius: 55, chunkedLoading: true });
+    markerMapRef.current.clear();
+
     items.forEach(vehicle => {
+      const isSelected = activeIdRef.current === vehicle.id;
       const color = vehicle.status === 'moving' ? '#25734a' : vehicle.status === 'alert' ? '#bd3d40' : '#b77900';
       const heading = (parseInt(vehicle.id.slice(3), 10) * 137) % 360;
-      const markerHtml = renderToStaticMarkup(<div className="moving-marker"><div className="direction-orbit" style={{transform:`rotate(${heading}deg)`}}><i className="direction-triangle" style={{borderBottomColor: vehicle.status === "idle" ? "#b77900" : "#25734a"}} /></div><div className="moving-marker-body" style={{backgroundColor:color}}><Truck size={16} /></div><div className="moving-marker-label"><b>{vehicle.id}</b> · {vehicle.sampleContext?.kind === 'offline' || vehicle.status === 'idle' ? 'Last: ' : ''}{vehicle.driver}</div></div>);
-      const marker = L.marker(vehicle.position, {icon: L.divIcon({className:'fleet-map-marker', html:markerHtml, iconSize:[30,30], iconAnchor:[15,15]})});
+      const markerHtml = renderToStaticMarkup(
+        <div className="moving-marker">
+          <div className="direction-orbit" style={{ transform: `rotate(${heading}deg)` }}>
+            <i className="direction-triangle" style={{ borderBottomColor: vehicle.status === 'idle' ? '#b77900' : '#25734a' }} />
+          </div>
+          <div className="moving-marker-body" style={{ backgroundColor: color }}>
+            <Truck size={16} />
+          </div>
+          <div className="moving-marker-label">
+            <b>{vehicle.id}</b> · {vehicle.sampleContext?.kind === 'offline' || vehicle.status === 'idle' ? 'Last: ' : ''}{vehicle.driver}
+          </div>
+        </div>
+      );
+      const marker = L.marker(vehicle.position, {
+        icon: L.divIcon({
+          className: `fleet-map-marker ${isSelected ? 'is-active-vehicle' : ''}`,
+          html: markerHtml,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        }),
+        zIndexOffset: isSelected ? 1000 : 0
+      });
+
+      marker.on('add', () => {
+        const el = marker.getElement();
+        if (el) {
+          if (activeIdRef.current === vehicle.id) {
+            el.classList.add('is-active-vehicle');
+          } else {
+            el.classList.remove('is-active-vehicle');
+          }
+        }
+      });
+
       const content = document.createElement('div');
       content.innerHTML = renderToStaticMarkup(<VehicleHoverCard vehicle={vehicle} />);
-      marker.bindTooltip(content, {direction:'top', offset:[0,-10], className:'vayu-tooltip'});
+      marker.bindTooltip(content, { direction: 'top', offset: [0, -10], className: 'vayu-tooltip' });
       marker.on('click', () => onSelect(vehicle.id));
+
+      markerMapRef.current.set(vehicle.id, marker);
       cluster.addLayer(marker);
     });
+
     map.addLayer(cluster);
     return () => { map.removeLayer(cluster); };
   }, [map, items, onSelect]);
+
+  // Fast active marker class toggle without re-clustering
+  const prevActiveRef = useRef(null);
+  useEffect(() => {
+    if (prevActiveRef.current && prevActiveRef.current !== activeId) {
+      const prevMarker = markerMapRef.current.get(prevActiveRef.current);
+      if (prevMarker) {
+        prevMarker.setZIndexOffset(0);
+        const el = prevMarker.getElement();
+        if (el) el.classList.remove('is-active-vehicle');
+      }
+    }
+    if (activeId) {
+      const nextMarker = markerMapRef.current.get(activeId);
+      if (nextMarker) {
+        nextMarker.setZIndexOffset(1000);
+        const el = nextMarker.getElement();
+        if (el) el.classList.add('is-active-vehicle');
+      }
+    }
+    prevActiveRef.current = activeId;
+  }, [activeId]);
+
   return null;
 }
 
@@ -243,7 +308,8 @@ function VayuBasemap() {
 }
 
 function FleetMap({ visibleVehicles, selectedId, onSelect, locateTarget, detailVehicle, playback, progress }) {
-  return <div className="map-panel"><div className="map-canvas"><MapContainer center={[20, 0]} zoom={2} minZoom={2} maxZoom={17} zoomControl={false} attributionControl scrollWheelZoom><VayuBasemap /><MapResizeObserver /><ClusteredVehicles vehicles={visibleVehicles} onSelect={onSelect} /><PlaybackMap vehicle={detailVehicle} active={playback} progress={progress} /><LocateVehicle target={locateTarget} detailVehicle={detailVehicle} playback={playback} /><MapControls /></MapContainer></div></div>;
+  const activeId = detailVehicle?.id;
+  return <div className="map-panel"><div className={`map-canvas ${activeId ? 'has-active-vehicle' : ''}`}><MapContainer center={[20, 0]} zoom={2} minZoom={2} maxZoom={17} zoomControl={false} attributionControl scrollWheelZoom><VayuBasemap /><MapResizeObserver /><ClusteredVehicles vehicles={visibleVehicles} onSelect={onSelect} activeId={activeId} /><PlaybackMap vehicle={detailVehicle} active={playback} progress={progress} /><LocateVehicle target={locateTarget} detailVehicle={detailVehicle} playback={playback} /><MapControls /></MapContainer></div></div>;
 }
 
 function LocationFilter({ location, onChange }) {
