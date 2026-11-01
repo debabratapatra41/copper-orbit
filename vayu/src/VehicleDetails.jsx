@@ -93,8 +93,6 @@ export default function VehicleDetails({ vehicle, onClose, onLocate, playback, s
 
       {/* Scrollable content area */}
       <div className="details-content">
-        <div className="sample-note">Live vehicle and trip data is not connected</div>
-
         {tab === 'overview' ? (
           <>
             <div className="detail-section">
