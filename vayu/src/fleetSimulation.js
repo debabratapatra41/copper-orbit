@@ -76,8 +76,13 @@ export function simulateFleet(baseVehicles, elapsedSeconds, now) {
       ...location,
       roadRoute: route,
       roadDistance,
+      simulationElapsed: elapsedSeconds,
+      simulationCruise: cruise,
+      simulationPhaseOffset: phaseOffset,
+      simulationHeld: held,
       hasAlert: vehicle.status === 'alert' || Boolean(vehicle.sampleContext?.title),
       status: motion,
+      statusDurationSeconds: held ? null : Math.floor(motion === 'moving' ? phase : motion === 'idle' ? phase - driving : phase - driving - idling),
       speed: `${motion === 'moving' ? cruise : 0} km/h`,
       updated: held && vehicle.sampleContext?.kind === 'offline' ? vehicle.updated : 'Now',
       updatedAt: held && vehicle.sampleContext?.kind === 'offline' ? vehicle.updatedAt : new Date(now),
@@ -162,4 +167,20 @@ export function getNearbyRoadRoute(origin, destination) {
   }
   steps.push({ text: 'Arrive at the nearby vehicle', metres });
   return { points, steps, metres, originId: origin.id, destinationId: destination.id };
+}
+
+// Return the portion of the simulated road path traversed in the last ten minutes.
+export function getRecentRoadTrail(vehicle) {
+  const route = vehicle?.roadRoute;
+  if (!route?.length || !Number.isFinite(vehicle.roadDistance) || !Number.isFinite(vehicle.simulationElapsed)) return [];
+  if (vehicle.simulationHeld) return [vehicle.position];
+  const movingTime = elapsed => { const cycles = Math.floor(elapsed / 100); const phase = elapsed - cycles * 100; return cycles * 65 + Math.min(phase, 65); };
+  const now = vehicle.simulationElapsed + vehicle.simulationPhaseOffset;
+  const travelled = (movingTime(now) - movingTime(now - 600)) * vehicle.simulationCruise / 3.6;
+  const end = vehicle.roadDistance;
+  const start = Math.max(0, end - travelled); // Do not join the unrelated ends of the stored path.
+  const points = [positionOnRoute(route, start).position];
+  route.coordinates.forEach(([lng, lat], index) => { if (route.cumulative[index] > start && route.cumulative[index] < end) points.push([lat, lng]); });
+  points.push(positionOnRoute(route, end).position);
+  return points;
 }

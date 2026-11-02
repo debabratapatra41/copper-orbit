@@ -11,13 +11,14 @@ import { setWorkerUrl } from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import mapStyle from './vayu-map-style.json';
-import { ArrowUpRight, Battery, Bell, Bookmark, Check, ChevronDown, ChevronsUp, Clock3, CloudSun, Download, Filter, Fuel, Gauge, Globe2, Layers, ListChevronsDownUp, ListChevronsUpDown, LocateFixed, Map as MapIcon, MapPin, MapPinned, MessageSquare, Minus, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Route, Satellite, Signal, Search, ShieldAlert, TriangleAlert, Truck } from 'lucide-react';
+import { ArrowUpDown, ArrowUpRight, Battery, Bell, Bookmark, Check, ChevronDown, ChevronsUp, Clock3, CloudSun, Download, Filter, Fuel, Gauge, Globe2, Layers, ListChevronsDownUp, ListChevronsUpDown, LocateFixed, Map as MapIcon, MapPin, MapPinned, Menu, MessageSquare, Minus, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Route, Satellite, Signal, Search, ShieldAlert, TriangleAlert, Truck } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import '../../design-system.css';
 import './styles.css';
 import VehicleDetails, { PlaybackMap } from './VehicleDetails';
 import VehicleSparkline from './VehicleSparkline';
-import { simulateFleet } from './fleetSimulation';
+import WeatherControls, { WeatherLayers, useWeatherData } from './WeatherControls';
+import { getRecentRoadTrail, simulateFleet } from './fleetSimulation';
 
 setWorkerUrl(workerUrl);
 
@@ -51,7 +52,7 @@ const baseVehicles = Array.from({length: 3000}, (_, index) => {
     offline: { kind, title: 'No tracker update for 12 min', detail: 'Current motion unknown · cause unconfirmed', action: 'Check connection' }
   };
   const updated = offline ? '12 min' : seed.updated;
-  return {...seed, status: offline ? 'alert' : seed.status, fuel: kind === 'energy' ? '18%' : seed.fuel, updated, driver: `${firstNames[driverIndex % firstNames.length]} ${lastNames[Math.floor(driverIndex / firstNames.length)]}`, updatedAt: new Date(sampleTime - (parseInt(updated, 10) || 0) * 60000), id: `VY-${String(index + 1001).padStart(4,'0')}`, location: hub[2], sampleContext: scenarios[kind], position: [hub[0] + Math.sin(n * 12.989 + index) * (0.04 + (n % 10) * 0.025), hub[1] + Math.cos(n * 7.31 + index) * (0.04 + (n % 10) * 0.025)]};
+  return {...seed, status: offline ? 'alert' : seed.status, fuel: kind === 'energy' ? '18%' : seed.fuel, updated, driver: `${firstNames[driverIndex % firstNames.length]} ${lastNames[Math.floor(driverIndex / firstNames.length)]}`, driverId: `DRV-${String(driverIndex + 1).padStart(4, '0')}`, driverAddress: `Unit ${driverIndex % 200 + 1}, Fleet Residences, ${hubs[driverIndex % hubs.length][2]}`, driverPhone: `+1 202 555 ${String(100 + driverIndex % 100).padStart(4, '0')}`, driverEmail: `driver${driverIndex + 1}@example.invalid`, driverDetailsGenerated: true, updatedAt: new Date(sampleTime - (parseInt(updated, 10) || 0) * 60000), id: `VY-${String(index + 1001).padStart(4,'0')}`, location: hub[2], sampleContext: scenarios[kind], position: [hub[0] + Math.sin(n * 12.989 + index) * (0.04 + (n % 10) * 0.025), hub[1] + Math.cos(n * 7.31 + index) * (0.04 + (n % 10) * 0.025)]};
 });
 
 const markerLabel = (vehicle, field) => field === 'driver' ? vehicle.driver : field === 'vin' ? (vehicle.vin || 'VIN unavailable') : field === 'type' ? vehicle.name : vehicle.id;
@@ -180,13 +181,24 @@ function ClusteredVehicles({ vehicles: items, onSelect, activeId, clustersReady 
 
 const statusLabels = { moving: 'Moving', idle: 'Idle', stopped: 'Stopped', alert: 'Alert' };
 
+function VersionSelector() {
+  const [open, setOpen] = useState(false);
+  const current = window.location.pathname.startsWith(`${import.meta.env.BASE_URL}v2/`) ? 2 : 1;
+  return <div className="version-picker" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }} onKeyDown={event => { if (event.key === 'Escape') { setOpen(false); event.currentTarget.querySelector('button')?.focus(); } }}>
+    <button type="button" className="version-picker-trigger" aria-label={`Select version, currently Version ${current}`} aria-expanded={open} aria-controls="version-options" onClick={() => setOpen(value => !value)}><span>Version {current}</span><ChevronDown size={14} /></button>
+    {open && <div className="version-picker-menu" id="version-options" aria-label="Available versions">{[1, 2].map(version => <a key={version} href={`${import.meta.env.BASE_URL}${version === 2 ? 'v2/' : ''}#fleet`} aria-current={current === version ? 'page' : undefined}><span>Version {version}</span>{current === version && <Check size={15} aria-hidden="true" />}</a>)}</div>}
+  </div>;
+}
+
 function MainNavigation({ onNotice }) {
   const [managementOpen, setManagementOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const closeIfLeaving = event => {
     if (!event.currentTarget.contains(event.relatedTarget)) setManagementOpen(false);
   };
   return (
     <header className="vayu-header">
+      <div className="mobile-nav-wrap" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setMobileNavOpen(false); }} onKeyDown={event => { if (event.key === 'Escape') { setMobileNavOpen(false); event.currentTarget.querySelector('.mobile-nav-trigger')?.focus(); } }}><button type="button" className="mobile-nav-trigger" aria-label="Navigation menu" aria-expanded={mobileNavOpen} aria-controls="mobile-navigation" onClick={() => setMobileNavOpen(value => !value)}><Menu size={20} /></button>{mobileNavOpen && <nav id="mobile-navigation" className="mobile-navigation" aria-label="Mobile navigation"><a href="#incidents" onClick={() => setMobileNavOpen(false)}>Incidents</a><details open><summary>Management <ChevronDown size={14} /></summary><a className="mobile-nav-current" href="#fleet" onClick={() => setMobileNavOpen(false)}>Fleet Details & Map</a><button type="button" onClick={() => { setMobileNavOpen(false); onNotice('Geofence Unification will be designed next.'); }}>Geofence Unification</button><button type="button" onClick={() => { setMobileNavOpen(false); onNotice('Action Centre will be designed next.'); }}>Action Centre</button></details><a href="#configurations" onClick={() => setMobileNavOpen(false)}>Configurations</a></nav>}</div>
       <a className="vayu-brand" href="#fleet" aria-label="Vayu fleet operations home"><img src="/vayu/vayu-mark-orange.png" alt="" className="vayu-mark" /><span className="vayu-wordmark">Vayu</span></a>
       <nav className="primary-nav" aria-label="Primary navigation">
         <a href="#incidents">Incidents</a>
@@ -201,7 +213,7 @@ function MainNavigation({ onNotice }) {
         <a href="#configurations">Configurations</a>
       </nav>
       <div className="header-tools">
-        <span className="live-state"><i />Live</span>
+        <VersionSelector />
         <button className="icon-button" aria-label="Notifications" onClick={() => onNotice('No new notifications.')}><Bell size={16} strokeWidth={1.8} /><i className="notification-dot" /></button>
         <button className="profile-button" aria-label="Open profile" onClick={() => onNotice('Profile settings will be connected next.')}><span>AD</span><span className="profile-copy"><b>Arjun Das</b><small>Fleet admin</small></span><ChevronDown size={14} /></button>
       </div>
@@ -252,18 +264,29 @@ function getVehicleAddress(vehicle) {
   return `125, Central Logistics Avenue, Sector 4, ${vehicle.location}`;
 }
 
+function formatStatusDuration(seconds) {
+  if (!Number.isFinite(seconds)) return '—';
+  const total = Math.max(0, Math.floor(seconds));
+  if (total < 60) return `${total}s`;
+  if (total < 3600) return `${Math.floor(total / 60)}m ${total % 60}s`;
+  return `${Math.floor(total / 3600)}h ${Math.floor(total % 3600 / 60)}m`;
+}
+
 function VehicleRow({ vehicle, selected, onSelect, onLocate, compact, distanceLabel }) {
   const address = getVehicleAddress(vehicle);
   const driverScore = 75 + (Number(vehicle.id.slice(3)) % 25);
   const fuelScore = 70 + (Number(vehicle.id.slice(3)) * 7 % 30);
   const offline = vehicle.sampleContext?.kind === 'offline';
   const isElectric = /\bEV\b/i.test(vehicle.name);
+  const statusName = offline ? 'Offline' : statusLabels[vehicle.status] || vehicle.status;
+  const statusDuration = formatStatusDuration(vehicle.statusDurationSeconds);
   const timestamp = vehicle.updatedAt.toLocaleString('en-IN', {year:'numeric', month:'short', day:'numeric', hour:'numeric', minute:'2-digit', second:'2-digit', timeZone:'Asia/Kolkata'}) + ' IST';
   return <div className={`vehicle-row tactical-card ${selected ? 'active' : ''}`} onClick={event => {
     if (!event.target.closest('button, a, input, select, textarea, .tactical-telemetry') && !window.getSelection()?.toString()) onSelect(vehicle.id);
   }}>
     <div className="tactical-header">
       <button className="tactical-identity" onClick={() => onSelect(vehicle.id)} aria-pressed={selected} aria-label={`${vehicle.id}, ${offline ? 'tracker offline' : statusLabels[vehicle.status]}`}><span className={`card-map-marker card-map-marker--${vehicle.status}`} aria-hidden="true"><Truck size={13} /></span><b>{vehicle.id}</b></button>
+      <span className="tactical-status-duration" title={statusDuration === '—' ? 'Time in status unavailable' : `${statusName} for ${statusDuration}`} aria-label={statusDuration === '—' ? `${statusName}, time in status unavailable` : `${statusName} for ${statusDuration}`}><Clock3 size={13} aria-hidden="true" />{statusName} · {statusDuration}</span>
       <span className="tactical-speed">{offline ? `Last known: ${vehicle.speed}` : vehicle.speed}</span>
       <span className="signal-indicators" title={offline ? 'Tracker offline' : 'GPS 11 satellites; network 4G, strong signal'} aria-label={offline ? 'Tracker offline' : 'GPS 11 satellites; network 4G, strong signal'}>{offline ? 'GPS stale' : <><span><Satellite size={13} /> 11</span><span><Signal size={13} /> 4G</span></>}</span>
     </div>
@@ -283,7 +306,7 @@ function centerInVisibleViewport(map, position, zoom = 16, animate = true, hasDe
   if (!mapSize || mapSize.x <= 0 || mapSize.y <= 0) return;
 
   const drawerEl = typeof document !== 'undefined' ? document.querySelector('.vehicle-details') : null;
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 760;
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 1024;
 
   let dx = 0;
   let dy = 0;
@@ -420,6 +443,26 @@ function MapEntranceController({ onMapZoomDone }) {
   return null;
 }
 
+function LiveVehicleTrail({ vehicle, active }) {
+  const map = useMap();
+  const points = useMemo(() => active ? getRecentRoadTrail(vehicle) : [], [active, vehicle]);
+  const pointsRef = useRef(points);
+  pointsRef.current = points;
+  useEffect(() => {
+    if (!active || !vehicle?.id) return;
+    const timer = window.setTimeout(() => {
+      const trail = pointsRef.current;
+      if (trail.length < 2) return;
+      const drawer = document.querySelector('.vehicle-details');
+      const mobile = window.innerWidth <= 1024;
+      map.fitBounds(trail, { paddingTopLeft: [48, 48], paddingBottomRight: mobile ? [48, (drawer?.offsetHeight || 300) + 32] : [(drawer?.offsetWidth || 440) + 32, 48], maxZoom: 16 });
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [map, active, vehicle?.id]);
+  if (points.length < 2) return null;
+  return <><Polyline positions={points} pathOptions={{ color: '#fff', weight: 7, opacity: .9, dashArray: '1 6', lineCap: 'round', interactive: false }} /><Polyline positions={points} pathOptions={{ color: '#f36c2d', weight: 4, opacity: .9, dashArray: '1 6', lineCap: 'round', interactive: false }} /><CircleMarker center={points[0]} radius={4} pathOptions={{ color: '#f36c2d', weight: 2, fillColor: '#fff', fillOpacity: 1, interactive: false }} /></>;
+}
+
 function NearbyHoverMarker({ vehicle, reveal = true }) {
   const map = useMap();
   useEffect(() => {
@@ -427,7 +470,7 @@ function NearbyHoverMarker({ vehicle, reveal = true }) {
     const point = map.latLngToContainerPoint(vehicle.position);
     const size = map.getSize();
     const drawer = document.querySelector('.vehicle-details');
-    const mobile = window.innerWidth <= 760;
+    const mobile = window.innerWidth <= 1024;
     const right = mobile ? size.x - 35 : size.x - (drawer?.offsetWidth || 0) - 35;
     const bottom = mobile ? size.y - (drawer?.offsetHeight || 0) - 35 : size.y - 35;
     if (point.x < 35 || point.x > right || point.y < 35 || point.y > bottom) centerInVisibleViewport(map, vehicle.position, map.getZoom(), true, true);
@@ -443,19 +486,28 @@ function NearbyRouteMap({ route }) {
   useEffect(() => {
     if (!route?.points?.length) return;
     const drawer = document.querySelector('.vehicle-details');
-    const mobile = window.innerWidth <= 760;
+    const mobile = window.innerWidth <= 1024;
     map.fitBounds(route.points, { paddingTopLeft: [40, 40], paddingBottomRight: mobile ? [40, (drawer?.offsetHeight || 300) + 24] : [(drawer?.offsetWidth || 440) + 24, 40], maxZoom: 16 });
   }, [map, route]);
   if (!route?.points?.length) return null;
   return <><Polyline positions={route.points} pathOptions={{ color: '#fff', weight: 8, opacity: 0.9, interactive: false }} /><Polyline positions={route.points} pathOptions={{ color: '#f36c2d', weight: 5, interactive: false }} /><CircleMarker center={route.points[0]} radius={7} pathOptions={{ color: '#fff', weight: 2, fillColor: '#25734a', fillOpacity: 1 }} /><CircleMarker center={route.points[route.points.length - 1]} radius={7} pathOptions={{ color: '#fff', weight: 2, fillColor: '#f36c2d', fillOpacity: 1 }} /></>;
 }
 
-function FleetMap({ visibleVehicles, selectedId, onSelect, locateTarget, detailVehicle, detailsClosing, playback, setPlayback, progress, setProgress, nearbyRoute, nearbyHover, nearbyDestination }) {
+function FleetMap({ mobileSheetHeight, visibleVehicles, selectedId, onSelect, locateTarget, detailVehicle, detailsClosing, playback, setPlayback, progress, setProgress, nearbyRoute, nearbyHover, nearbyDestination, liveTrailVehicle, liveTrailActive, selectedTrip, weatherVehicles, weatherAvailable }) {
   const activeId = detailVehicle?.id;
   const [clustersReady, setClustersReady] = useState(false);
   const [clustersLoading, setClustersLoading] = useState(false);
   const [satellite, setSatellite] = useState(false);
   const [layersOpen, setLayersOpen] = useState(false);
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
+  const [weatherOpen, setWeatherOpen] = useState(false);
+  const [weatherEnabled, setWeatherEnabled] = useState(false);
+  const [weatherRadar, setWeatherRadar] = useState(false);
+  const [weatherLocate, setWeatherLocate] = useState(null);
+  const weatherStarted = useRef(false);
+  const weather = useWeatherData(weatherOpen || weatherEnabled);
+  useEffect(() => { if (!weatherAvailable) { setWeatherOpen(false); setWeatherLocate(null); } }, [weatherAvailable]);
+
   const [labels, setLabels] = useState({ top: false, bottom: true, topField: 'driver', bottomField: 'id' });
   const example = visibleVehicles[0] || { id: 'VY-1001', driver: 'Aarav Sharma', name: 'Tata Ace EV' };
   const options = [['id','Vehicle ID'],['driver','Driver name'],['vin','VIN'],['type','Vehicle type']];
@@ -502,20 +554,25 @@ function FleetMap({ visibleVehicles, selectedId, onSelect, locateTarget, detailV
           <MapAttributionPosition />
           <VayuBasemap satellite={satellite} />
           <MapResizeObserver />
+          <WeatherLayers features={weather.features} enabled={weatherEnabled && weatherAvailable} radar={weatherRadar && weatherAvailable} locate={weatherAvailable ? weatherLocate : null} />
           <MapEntranceController onMapZoomDone={handleMapZoomDone} />
           {!playback && <ClusteredVehicles vehicles={visibleVehicles} onSelect={onSelect} activeId={activeId} clustersReady={clustersReady || Boolean(detailVehicle)} labels={labels} />}
+          <LiveVehicleTrail vehicle={liveTrailVehicle} active={liveTrailActive} />
           <NearbyRouteMap route={nearbyRoute} />
           {!playback && <NearbyHoverMarker vehicle={nearbyDestination} reveal={false} />}
           {!playback && nearbyHover?.id !== nearbyDestination?.id && <NearbyHoverMarker vehicle={nearbyHover} />}
-          <PlaybackMap vehicle={detailVehicle} active={playback} progress={progress} setProgress={setProgress} setPlayback={setPlayback} />
+          <PlaybackMap vehicle={detailVehicle} selectedTrip={selectedTrip} active={playback} progress={progress} setProgress={setProgress} setPlayback={setPlayback} />
           <LocateVehicle target={locateTarget} detailVehicle={detailVehicle} playback={playback} />
           <MapControls />
         </MapContainer>
-        <div className="map-display-controls">
+        {liveTrailActive && liveTrailVehicle && <div className="live-trail-legend"><span />Last 10 minutes</div>}
+        <button type="button" className="mobile-map-launcher" aria-label="Map controls" aria-expanded={mobileControlsOpen} onClick={() => { setMobileControlsOpen(value => !value); if (mobileControlsOpen) { setLayersOpen(false); setWeatherOpen(false); } }}><Layers size={19} /></button>
+        <div className={`map-display-controls ${mobileControlsOpen ? 'mobile-controls-open' : ''}`}>
           <button type="button" className="map-display-button map-style-button" aria-label={satellite ? 'Switch to normal map' : 'Switch to satellite map'} title={satellite ? 'Switch to normal map' : 'Switch to satellite map'} aria-pressed={satellite} onClick={() => setSatellite(value => !value)}><Globe2 size={19} /></button>
-          <button type="button" className="map-display-button map-style-button" aria-label="Map layers" aria-expanded={layersOpen} aria-controls="map-label-settings" title="Map layers" onClick={() => setLayersOpen(value => !value)}><Layers size={19} /></button>
-          <button type="button" className="map-display-button map-style-button" aria-label="Weather" aria-disabled="true" title="Weather"><CloudSun size={19} /></button>
+          <button type="button" className="map-display-button map-style-button" aria-label="Map layers" aria-expanded={layersOpen} aria-controls="map-label-settings" title="Map layers" onClick={() => { setWeatherOpen(false); setLayersOpen(value => !value); }}><Layers size={19} /></button>
+          <div className="weather-control-wrap"><button type="button" className="map-display-button map-style-button" aria-label="Weather" aria-disabled={!weatherAvailable} aria-describedby={!weatherAvailable ? 'weather-live-tooltip' : undefined} aria-expanded={weatherOpen} aria-controls="weather-alert-panel" title={weatherAvailable ? 'Weather' : undefined} onClick={() => { if (!weatherAvailable) return; setLayersOpen(false); setWeatherOpen(value => !value); if (!weatherStarted.current) { weatherStarted.current = true; setWeatherEnabled(true); } }}><CloudSun size={19} /></button>{!weatherAvailable && <span role="tooltip" id="weather-live-tooltip" className="weather-live-tooltip">Weather only visible in Live</span>}</div>
           <button type="button" className="map-display-button map-style-button" aria-label="Geofence" aria-disabled="true" title="Geofence"><MapPinned size={19} /></button>
+          <WeatherControls open={weatherOpen} onClose={() => setWeatherOpen(false)} enabled={weatherEnabled} setEnabled={setWeatherEnabled} radar={weatherRadar} setRadar={setWeatherRadar} features={weather.features} status={weather.status} error="Check your connection and try again." refresh={weather.refresh} vehicles={weatherVehicles} onLocate={feature => { setWeatherEnabled(true); setWeatherLocate({ feature, at: Date.now() }); }} />
           {layersOpen && <section className="map-label-panel" id="map-label-settings" aria-label="Map layers" onKeyDown={event => { if (event.key === 'Escape') { setLayersOpen(false); document.querySelector('.map-display-button[aria-controls]')?.focus(); } }}>
             <div className="map-label-heading"><div><b>Map layers</b><span>Customize vehicle markers</span></div><button type="button" aria-label="Close map layers" onClick={() => setLayersOpen(false)}>×</button></div>
             <div className="marker-preview" aria-label="Vehicle marker preview"><div className="preview-caption">MARKER PREVIEW</div><div className="marker-preview-content"><span className="preview-truck"><Truck size={16} /></span>{(labels.top || labels.bottom) && <span className="preview-label-box">{labels.top && <span className="preview-label">{markerLabel(example, labels.topField)}</span>}{labels.bottom && <span className="preview-label">{markerLabel(example, labels.bottomField)}</span>}</span>}</div></div>
@@ -538,6 +595,22 @@ function LocationFilter({ location, onChange }) {
   </div>;
 }
 
+const fleetSortOptions = [['default', 'Default order'], ['status', 'Time in status'], ['speed', 'Speed'], ['energy', 'Fuel / battery level'], ['driving', 'Driving score'], ['fuel', 'Fuel score']];
+function FleetSort({ field, direction, onFieldChange, onDirectionChange }) {
+  const [open, setOpen] = useState(false);
+  return <div className="fleet-sort" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }} onKeyDown={event => { if (event.key === 'Escape') { setOpen(false); event.currentTarget.querySelector('.fleet-sort-trigger')?.focus(); } }}><button type="button" className="icon-button subtle fleet-sort-trigger" aria-label="Sort vehicles" title="Sort vehicles" aria-expanded={open} aria-controls="fleet-sort-menu" onClick={() => setOpen(value => !value)}><ArrowUpDown size={16} /></button>{open && <div className="fleet-sort-menu" id="fleet-sort-menu"><div className="fleet-sort-title">Sort vehicles</div><div role="group" aria-label="Sort by">{fleetSortOptions.map(([key, label]) => <button type="button" key={key} className="fleet-sort-option" aria-pressed={field === key} onClick={() => onFieldChange(key)}><span>{label}</span>{field === key && <Check size={15} aria-hidden="true" />}</button>)}</div><div className="fleet-sort-direction" role="group" aria-label="Sort direction"><button type="button" disabled={field === 'default'} aria-pressed={direction === 'asc'} onClick={() => onDirectionChange('asc')}>Low to high</button><button type="button" disabled={field === 'default'} aria-pressed={direction === 'desc'} onClick={() => onDirectionChange('desc')}>High to low</button></div></div>}</div>;
+}
+function fleetSortValue(vehicle, field) {
+  if (field === 'status') return Number.isFinite(vehicle.statusDurationSeconds) ? vehicle.statusDurationSeconds : null;
+  if (field === 'speed') return vehicle.sampleContext?.kind === 'offline' ? null : (Number.isFinite(parseFloat(vehicle.speed)) ? parseFloat(vehicle.speed) : null);
+  if (field === 'energy') return Number.isFinite(parseFloat(vehicle.fuel)) ? parseFloat(vehicle.fuel) : null;
+  const id = Number(vehicle.id.slice(3));
+  if (!Number.isFinite(id)) return null;
+  if (field === 'driving') return 75 + id % 25;
+  if (field === 'fuel') return 70 + id * 7 % 30;
+  return null;
+}
+
 function FleetWorkspace({ onNotice }) {
   const [simulationTime, setSimulationTime] = useState(() => Date.now());
   useEffect(() => {
@@ -552,6 +625,9 @@ function FleetWorkspace({ onNotice }) {
     const timer = window.setInterval(() => setMapVehicles(vehiclesRef.current), 10000);
     return () => window.clearInterval(timer);
   }, []);
+  const [mobileSheetHeight, setMobileSheetHeight] = useState(48);
+  const sheetDragRef = useRef(null);
+  const sheetHandle = <div className="mobile-sheet-grab" role="separator" tabIndex={0} aria-label="Resize bottom sheet" aria-orientation="horizontal" aria-valuemin={18} aria-valuemax={85} aria-valuenow={Math.round(mobileSheetHeight)} onPointerDown={event => { if (event.button !== 0) return; sheetDragRef.current = { y: event.clientY, height: mobileSheetHeight }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={event => { if (!sheetDragRef.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return; setMobileSheetHeight(Math.min(85, Math.max(18, sheetDragRef.current.height + (sheetDragRef.current.y - event.clientY) / window.innerHeight * 100))); }} onPointerUp={() => { sheetDragRef.current = null; }} onLostPointerCapture={() => { sheetDragRef.current = null; }} onKeyDown={event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); setMobileSheetHeight(value => Math.min(85, Math.max(18, value + (event.key === 'ArrowUp' ? 5 : -5)))); } }}><span /></div>;
   const [panelWidth, setPanelWidth] = useState(25);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [resizing, setResizing] = useState(false);
@@ -566,6 +642,8 @@ function FleetWorkspace({ onNotice }) {
   };
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
+  const [sortField, setSortField] = useState('default');
+  const [sortDirection, setSortDirection] = useState('desc');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [compactView, setCompactView] = useState(true);
   const [location, setLocation] = useState('all');
@@ -587,6 +665,8 @@ function FleetWorkspace({ onNotice }) {
     closeTimer.current = window.setTimeout(() => { setDetailId(null); setDetailsClosing(false); }, duration);
   };
   const [demoCredits, setDemoCredits] = useState(1000);
+  const [detailsTab, setDetailsTab] = useState('overview');
+  const [selectedTrip, setSelectedTrip] = useState('all');
   const [nearbyRoute, setNearbyRoute] = useState(null);
   const [nearbyHover, setNearbyHover] = useState(null);
   const [nearbyDestination, setNearbyDestination] = useState(null);
@@ -595,6 +675,7 @@ function FleetWorkspace({ onNotice }) {
   const openVehicle = useCallback(id => {
     window.clearTimeout(closeTimer.current);
     setDetailsClosing(false);
+    setDetailsTab('overview');
     setNearbyRoute(null);
     setNearbyHover(null);
     setNearbyDestination(null);
@@ -611,9 +692,20 @@ function FleetWorkspace({ onNotice }) {
     const matchesQuery = [vehicle.id, vehicle.name, vehicle.driver, vehicle.location].join(' ').toLowerCase().includes(query.toLowerCase());
     return matchesFilter && matchesQuery && (location === 'all' || vehicle.location === location);
   }, [filter, query, location]);
-  const filtered = useMemo(() => vehicles.filter(matchesVehicle), [vehicles, matchesVehicle]);
+  const filtered = useMemo(() => {
+    const result = vehicles.filter(matchesVehicle);
+    if (sortField === 'default') return result;
+    const sign = sortDirection === 'asc' ? 1 : -1;
+    return result.sort((a, b) => {
+      const first = fleetSortValue(a, sortField), second = fleetSortValue(b, sortField);
+      if (first === null && second === null) return a.id.localeCompare(b.id);
+      if (first === null) return 1;
+      if (second === null) return -1;
+      return (first - second) * sign || a.id.localeCompare(b.id);
+    });
+  }, [vehicles, matchesVehicle, sortField, sortDirection]);
   const filteredMap = useMemo(() => mapVehicles.filter(matchesVehicle), [mapVehicles, matchesVehicle]);
-  return <section className={`fleet-workspace ${resizing ? "is-resizing" : ""} ${panelCollapsed ? "is-panel-collapsed" : ""}`} style={{"--fleet-panel-width": `max(200px, ${panelWidth}vw)`}}><aside id="fleet-panel" className="fleet-panel" aria-label="Fleet vehicles" hidden={panelCollapsed}><div className="fleet-search-row"><button className="icon-button subtle" aria-label="Filter options" aria-expanded={filtersOpen} aria-controls="fleet-filters" onClick={() => setFiltersOpen(!filtersOpen)}><Filter size={15} /></button><button className="icon-button subtle view-toggle" aria-label={compactView ? "Switch to full view" : "Switch to compact view"} title={compactView ? "Switch to full view" : "Switch to compact view"} aria-pressed={compactView} onClick={() => setCompactView(view => !view)}>{compactView ? <ListChevronsUpDown size={16} /> : <ListChevronsDownUp size={16} />}</button><label className="search-field"><span className="sr-only">Search fleet</span><Search size={15} /><input value={query} onChange={event => setQuery(event.target.value)} type="search" placeholder="Search vehicle, driver or location" /><kbd>⌘ K</kbd></label></div><div id="fleet-filters" className="fleet-filter-panel" hidden={!filtersOpen}><div className="filter-panel-heading"><b>Filters</b><button onClick={() => { setLocation('all'); setFilter('all'); }}>Clear all</button></div><LocationFilter location={location} onChange={setLocation} /><p>{filtered.length} matching vehicles</p></div><div className="status-filters" role="group" aria-label="Filter vehicles by status">{[['all','All'],['moving','Moving'],['idle','Idle'],['stopped','Stopped'],['alert','Alerts']].map(([key,label]) => <button type="button" key={key} className={filter === key ? 'active' : ''} aria-pressed={filter === key} onClick={() => setFilter(key)}>{label}</button>)}</div><div className={`fleet-list ${compactView ? 'compact' : ''}`}>{filtered.slice(0, 100).map(vehicle => <VehicleRow key={vehicle.id} vehicle={vehicle} compact={compactView} selected={vehicle.id === selectedId} onSelect={openVehicle} onLocate={vehicle => { cancelDetailClose(); setSelectedId(vehicle.id); setDetailId(vehicle.id); setLocateTarget({...vehicle, _ts: Date.now()}); }} />)}</div>{filtered.length === 0 && <div className="fleet-empty"><Search size={24} /><b>No vehicles found</b><p>Try a different search or status filter.</p></div>}</aside><button type="button" className="fleet-panel-toggle" aria-label={panelCollapsed ? "Expand fleet panel" : "Collapse fleet panel"} title={panelCollapsed ? "Expand fleet panel" : "Collapse fleet panel"} aria-controls="fleet-panel" aria-expanded={!panelCollapsed} onClick={() => setPanelCollapsed(value => !value)}>{panelCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button><div className="fleet-resizer" role="separator" tabIndex={0} aria-label="Resize fleet panel" aria-controls="fleet-panel" aria-orientation="vertical" aria-valuemin={20} aria-valuemax={60} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth}% of viewport width`} title="Drag to resize fleet panel" onPointerDown={event => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); event.currentTarget.focus(); setResizing(true); }} onPointerMove={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) resizeFromPointer(event); }} onPointerUp={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); setResizing(false); }} onLostPointerCapture={() => setResizing(false)} onKeyDown={handleResizeKey}><span aria-hidden="true" /></div><FleetMap visibleVehicles={filteredMap} selectedId={selectedId} onSelect={openVehicle} locateTarget={locateTarget} detailVehicle={detailVehicle} detailsClosing={detailsClosing} playback={playback} setPlayback={setPlayback} progress={progress} setProgress={setProgress} nearbyRoute={nearbyRoute} nearbyHover={nearbyHover} nearbyDestination={nearbyDestination} />{detailVehicle && <VehicleDetails key={detailVehicle.id} vehicle={detailVehicle} fleetVehicles={mapVehicles} onNearbyRoute={setNearbyRoute} onNearbyHover={setNearbyHover} onNearbyDestination={setNearbyDestination} renderNearbyVehicle={(nearby, distanceLabel, onChoose) => <VehicleRow vehicle={nearby} distanceLabel={distanceLabel} compact selected={false} onSelect={onChoose} onLocate={onChoose} />} closing={detailsClosing} onClose={closeDetails} onLocate={vehicle => setLocateTarget({...vehicle, _ts: Date.now()})} playback={playback} setPlayback={setPlayback} progress={progress} setProgress={setProgress} demoCredits={demoCredits} setDemoCredits={setDemoCredits} />}</section>;
+  return <section className={`fleet-workspace ${resizing ? "is-resizing" : ""} ${panelCollapsed ? "is-panel-collapsed" : ""}`} style={{"--fleet-panel-width": `max(200px, ${panelWidth}vw)`, "--mobile-sheet-height": `${mobileSheetHeight}dvh`}}><aside id="fleet-panel" className="fleet-panel" aria-label="Fleet vehicles" hidden={panelCollapsed}>{sheetHandle}<div className="fleet-search-row"><button className="icon-button subtle" aria-label="Filter options" aria-expanded={filtersOpen} aria-controls="fleet-filters" onClick={() => setFiltersOpen(!filtersOpen)}><Filter size={15} /></button><FleetSort field={sortField} direction={sortDirection} onFieldChange={setSortField} onDirectionChange={setSortDirection} /><button className="icon-button subtle view-toggle" aria-label={compactView ? "Switch to full view" : "Switch to compact view"} title={compactView ? "Switch to full view" : "Switch to compact view"} aria-pressed={compactView} onClick={() => setCompactView(view => !view)}>{compactView ? <ListChevronsUpDown size={16} /> : <ListChevronsDownUp size={16} />}</button><label className="search-field"><span className="sr-only">Search fleet</span><Search size={15} /><input value={query} onChange={event => setQuery(event.target.value)} type="search" placeholder="Search vehicle, driver or location" /><kbd>⌘ K</kbd></label></div><div id="fleet-filters" className="fleet-filter-panel" hidden={!filtersOpen}><div className="filter-panel-heading"><b>Filters</b><button onClick={() => { setLocation('all'); setFilter('all'); }}>Clear all</button></div><LocationFilter location={location} onChange={setLocation} /><p>{filtered.length} matching vehicles</p></div><div className="status-filters" role="group" aria-label="Filter vehicles by status">{[['all','All'],['moving','Moving'],['idle','Idle'],['stopped','Stopped'],['alert','Alerts']].map(([key,label]) => <button type="button" key={key} className={filter === key ? 'active' : ''} aria-pressed={filter === key} onClick={() => setFilter(key)}>{label}</button>)}</div><div className={`fleet-list ${compactView ? 'compact' : ''}`}>{filtered.slice(0, 100).map(vehicle => <VehicleRow key={vehicle.id} vehicle={vehicle} compact={compactView} selected={vehicle.id === selectedId} onSelect={openVehicle} onLocate={vehicle => { cancelDetailClose(); setSelectedId(vehicle.id); setDetailId(vehicle.id); setLocateTarget({...vehicle, _ts: Date.now()}); }} />)}</div>{filtered.length === 0 && <div className="fleet-empty"><Search size={24} /><b>No vehicles found</b><p>Try a different search or status filter.</p></div>}</aside><button type="button" className="fleet-panel-toggle" aria-label={panelCollapsed ? "Expand fleet panel" : "Collapse fleet panel"} title={panelCollapsed ? "Expand fleet panel" : "Collapse fleet panel"} aria-controls="fleet-panel" aria-expanded={!panelCollapsed} onClick={() => setPanelCollapsed(value => !value)}>{panelCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button><div className="fleet-resizer" role="separator" tabIndex={0} aria-label="Resize fleet panel" aria-controls="fleet-panel" aria-orientation="vertical" aria-valuemin={20} aria-valuemax={60} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth}% of viewport width`} title="Drag to resize fleet panel" onPointerDown={event => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); event.currentTarget.focus(); setResizing(true); }} onPointerMove={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) resizeFromPointer(event); }} onPointerUp={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); setResizing(false); }} onLostPointerCapture={() => setResizing(false)} onKeyDown={handleResizeKey}><span aria-hidden="true" /></div><FleetMap mobileSheetHeight={mobileSheetHeight} visibleVehicles={filteredMap} selectedId={selectedId} onSelect={openVehicle} locateTarget={locateTarget} detailVehicle={detailVehicle} detailsClosing={detailsClosing} playback={playback} setPlayback={setPlayback} progress={progress} setProgress={setProgress} nearbyRoute={nearbyRoute} nearbyHover={nearbyHover} nearbyDestination={nearbyDestination} liveTrailVehicle={mapVehicles.find(item => item.id === detailId)} liveTrailActive={Boolean(detailVehicle && !detailsClosing && detailsTab === 'overview' && !playback)} selectedTrip={selectedTrip} weatherVehicles={mapVehicles} weatherAvailable={!detailVehicle || detailsTab !== 'history'} />{detailVehicle && <VehicleDetails key={detailVehicle.id} mobileSheetHandle={sheetHandle} vehicle={detailVehicle} onDetailsTabChange={setDetailsTab} onSelectedTripChange={setSelectedTrip} fleetVehicles={mapVehicles} onNearbyRoute={setNearbyRoute} onNearbyHover={setNearbyHover} onNearbyDestination={setNearbyDestination} renderNearbyVehicle={(nearby, distanceLabel, onChoose) => <VehicleRow vehicle={nearby} distanceLabel={distanceLabel} compact selected={false} onSelect={onChoose} onLocate={onChoose} />} closing={detailsClosing} onClose={closeDetails} onLocate={vehicle => setLocateTarget({...vehicle, _ts: Date.now()})} playback={playback} setPlayback={setPlayback} progress={progress} setProgress={setProgress} demoCredits={demoCredits} setDemoCredits={setDemoCredits} />}</section>;
 }
 
 function App({ onNotice }) {
@@ -634,10 +726,16 @@ function App({ onNotice }) {
   return <><MainNavigation onNotice={onNotice} /><main className="vayu-main" id="fleet"><section className="page-heading"><div><p className="breadcrumb">Management <span>/</span> Fleet Details & Map</p><div className="title-line"><h1>Fleet Details & Map</h1><button className={`bookmark-trigger ${bookmarked ? 'active' : ''}`} aria-label="Bookmark Fleet Details & Map" aria-pressed={bookmarked} onClick={() => setBookmarked(!bookmarked)}><Bookmark size={17} fill={bookmarked ? 'currentColor' : 'none'} /></button></div></div><div className="page-actions"><span className="last-updated"><i />Updated just now</span><button className="co-button" onClick={() => onNotice('Export will be available in a later step.')}><Download size={14} />Export</button><div className="more-menu-wrap" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setMoreOpen(false); }} onKeyDown={event => { if (event.key === 'Escape') { setMoreOpen(false); event.currentTarget.querySelector('button')?.focus(); } }}><button className="co-icon-button" aria-label="More options" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)}><MoreHorizontal size={20} /></button>{moreOpen && <div className="more-menu" role="menu"><button role="menuitem" onClick={() => { setMoreOpen(false); onNotice('Messages will be available in a later step.'); }}><MessageSquare size={15} /><span>Show messages</span></button><button role="menuitem" onClick={() => { setMoreOpen(false); onNotice('Safety controls will be available in a later step.'); }}><ShieldAlert size={15} /><span>Disable Safety</span></button></div>}</div></div></section><FleetWorkspace onNotice={onNotice} /></main></>;
 }
 
+function OverviewSkeleton() {
+  return <div className="overview-skeleton" role="status" aria-label="Loading fleet overview"><span className="sr-only">Loading fleet overview</span><header className="skeleton-header" aria-hidden="true"><span className="skeleton-block skeleton-brand"/><span className="skeleton-block skeleton-nav"/><span className="skeleton-block skeleton-profile"/></header><div className="skeleton-heading" aria-hidden="true"><span className="skeleton-block skeleton-heading-title"/><span className="skeleton-block skeleton-heading-action"/></div><div className="skeleton-workspace" aria-hidden="true"><aside className="skeleton-fleet"><span className="skeleton-block skeleton-search"/><div className="skeleton-filters">{[0,1,2,3].map(item => <span key={item} className="skeleton-block" />)}</div><div className="skeleton-cards">{Array.from({length:8}, (_, index) => <div className="skeleton-block skeleton-card" key={index} />)}</div></aside><div className="skeleton-map"><span className="skeleton-block skeleton-map-control"/></div></div></div>;
+}
+
 function Root() {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { const timer = window.setTimeout(() => setLoading(false), 1000); return () => window.clearTimeout(timer); }, []);
   const [notice, setNotice] = useState('');
   const onNotice = message => { setNotice(message); window.clearTimeout(window.__vayuNotice); window.__vayuNotice = window.setTimeout(() => setNotice(''), 3000); };
-  return <><App onNotice={onNotice} /><div className={`toast ${notice ? 'visible' : ''}`} role="status" aria-live="polite">{notice}</div></>;
+  return <>{loading ? <OverviewSkeleton /> : <App onNotice={onNotice} />}<div className={`toast ${notice ? 'visible' : ''}`} role="status" aria-live="polite">{notice}</div></>;
 }
 
 createRoot(document.getElementById('root')).render(<Root />);

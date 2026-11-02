@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import LiveDashcam from './LiveDashcam';
 import VehicleRecords from './VehicleRecords';
+import DriverELD from './DriverELD';
+import VehicleTelematics from './VehicleTelematics';
+import VehicleFaults from './VehicleFaults';
 import { getNearbyRoadRoute, getRoadReplay } from './fleetSimulation';
 import { CircleMarker, Polyline, Tooltip, useMap } from 'react-leaflet';
 import {
@@ -10,11 +13,13 @@ import {
   Map as MapIcon,
   MapPin,
   UserRound,
+  Search,
   UsersRound,
   Video,
   Wrench,
   AlertTriangle,
   Calendar,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -34,12 +39,13 @@ import {
   DashcamStudioModal,
   DashcamScrubberPreview,
   projectLatLngToRoute,
+  getRouteMetrics,
   getCoordinateAtProgress
 } from './DashcamInspector';
 
 function getDrawerOffset() {
   const drawerEl = typeof document !== 'undefined' ? document.querySelector('.vehicle-details') : null;
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 760;
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 1024;
   if (isMobile) {
     const drawerH = drawerEl ? drawerEl.offsetHeight : 340;
     return {
@@ -73,7 +79,7 @@ function generateSmoothPath(pts, getX, getY) {
   return d;
 }
 
-export function PlaybackMap({ vehicle, progress, active, setProgress, setPlayback }) {
+export function PlaybackMap({ vehicle, progress, active, setProgress, setPlayback, selectedTrip = 'all' }) {
   const map = useMap();
   const telemetry = useMemo(() => {
     return vehicle ? getTripTelemetry(vehicle.id) : null;
@@ -84,7 +90,16 @@ export function PlaybackMap({ vehicle, progress, active, setProgress, setPlaybac
   const hoverLeaveTimerRef = useRef(null);
 
   // Freeze the road section when this vehicle is selected, so live updates do not move the replay.
-  const points = useMemo(() => getRoadReplay(vehicle), [vehicle?.id]);
+  const fullRoute = useMemo(() => getRoadReplay(vehicle), [vehicle?.id]);
+  const points = useMemo(() => {
+    if (selectedTrip === 'all' || fullRoute.length < 2) return fullRoute;
+    const tripIndex = Number(selectedTrip.split('#')[1]);
+    if (!Number.isInteger(tripIndex) || tripIndex < 0 || tripIndex > 4) return fullRoute;
+    const start = tripIndex * 20, end = start + 20;
+    const { totalDist, cumDists } = getRouteMetrics(fullRoute);
+    const between = fullRoute.filter((_, index) => cumDists[index] > totalDist * start / 100 && cumDists[index] < totalDist * end / 100);
+    return [getCoordinateAtProgress(fullRoute, start), ...between, getCoordinateAtProgress(fullRoute, end)];
+  }, [fullRoute, selectedTrip]);
 
   // Fit the whole route into the unobstructed visible viewport (avoiding drawer)
   useEffect(() => {
@@ -461,8 +476,11 @@ function formatDayLabel(dateKey) {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNearbyVehicle, onNearbyRoute, onNearbyHover, onNearbyDestination, closing, onClose, onLocate, playback, setPlayback, progress, setProgress, demoCredits, setDemoCredits }) {
+export default function VehicleDetails({ vehicle, mobileSheetHandle, onDetailsTabChange, onSelectedTripChange, fleetVehicles = [], renderNearbyVehicle, onNearbyRoute, onNearbyHover, onNearbyDestination, closing, onClose, onLocate, playback, setPlayback, progress, setProgress, demoCredits, setDemoCredits }) {
+  const [detailsLoading, setDetailsLoading] = useState(true);
+  useEffect(() => { const timer = window.setTimeout(() => setDetailsLoading(false), 500); return () => window.clearTimeout(timer); }, []);
   const [tab, setTab] = useState('overview');
+  useEffect(() => { onDetailsTabChange(tab); }, [tab, onDetailsTabChange]);
   const [mediaOpen, setMediaOpen] = useState(false);
   const [nearbyRadius, setNearbyRadius] = useState(5);
   const [nearbySelection, setNearbySelection] = useState(null);
@@ -490,8 +508,14 @@ export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNear
       return { vehicle: item, distance: 12742 * Math.asin(Math.min(1, Math.sqrt(a))) };
     }).filter(item => item.distance <= nearbyRadius).sort((a, b) => a.distance - b.distance);
   }, [fleetVehicles, vehicle.id, nearbyRadius]);
-  const [view, setView] = useState('timeline');
+  const [selectedTrip, setSelectedTrip] = useState('all');
+  useEffect(() => { onSelectedTripChange(selectedTrip); }, [selectedTrip, onSelectedTripChange]);
+  const [tripMenuOpen, setTripMenuOpen] = useState(false);
   const [timelineFilter, setTimelineFilter] = useState('all');
+  const [timelineSearch, setTimelineSearch] = useState('');
+  const [timelineSearchOpen, setTimelineSearchOpen] = useState(false);
+  const timelineSearchRef = useRef(null);
+  useEffect(() => { if (timelineSearchOpen) timelineSearchRef.current?.focus(); }, [timelineSearchOpen]);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
 
@@ -516,6 +540,9 @@ export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNear
   useEffect(() => {
     setTab('overview');
     setTimelineFilter('all');
+    setTimelineSearch('');
+    setTimelineSearchOpen(false);
+    setSelectedTrip('all');
     setPlaying(false);
     setProgress(0);
     setPlayback(false);
@@ -569,15 +596,22 @@ export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNear
     setTab('history');
   };
 
-  const seconds = 9 * 3600 + 52 * 60 + 30 + Math.round(progress * 30);
+  const selectedTripNumber = selectedTrip === 'all' ? 0 : Number(selectedTrip.split('#')[1] || 0);
+  const seconds = (6 * 60 + selectedTripNumber * 150) * 60 + Math.round(progress * 69 * 60 / 100);
   const time = [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60]
     .map(n => String(n).padStart(2, '0'))
     .join(':');
 
   // Telemetry data generator
   const telemetryData = useMemo(() => {
-    return getTripTelemetry(vehicle.id);
-  }, [vehicle.id]);
+    const data = getTripTelemetry(vehicle.id);
+    const points = data.points.map(point => {
+      const value = (6 * 60 + selectedTripNumber * 150) * 60 + Math.round(point.progress * 69 * 60 / 100);
+      const timeStr = [Math.floor(value / 3600), Math.floor(value / 60) % 60, value % 60].map(part => String(part).padStart(2, '0')).join(':');
+      return { ...point, timeStr };
+    });
+    return { ...data, points, incidents: points.filter(point => point.event && point.event.type !== 'start' && point.event.type !== 'end') };
+  }, [vehicle.id, selectedTripNumber]);
 
   const currentTelemetry = telemetryData.points[Math.min(100, Math.max(0, progress))] || telemetryData.points[0];
   const displayTelemetry = hoverProgress !== null
@@ -742,41 +776,6 @@ export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNear
     }
   }, [progress, updateScrollButtons]);
 
-  // Multi-day events dataset
-  const eventsByDay = useMemo(() => {
-    return {
-      '2026-10-31': [
-        { at: 0, time: '09:52', label: 'Trip started', detail: 'Ignition on', isIncident: false },
-        { at: 12, time: '09:58', label: 'Harsh acceleration', detail: '+2.8 m/s² · Rapid acceleration', isIncident: true },
-        { at: 38, time: '10:11', label: 'Stop', detail: 'Stopped for 4 minutes', isIncident: true },
-        { at: 52, time: '10:18', label: 'Speed limit exceeded', detail: '58 km/h in 50 km/h zone', isIncident: true },
-        { at: 65, time: '10:25', label: 'Harsh turn', detail: '0.42 g lateral acceleration', isIncident: true },
-        { at: 78, time: '10:32', label: 'Harsh braking', detail: '-3.6 m/s² deceleration', isIncident: true },
-        { at: 100, time: '10:42', label: 'Trip ended', detail: 'Destination reached', isIncident: false }
-      ],
-      '2026-10-30': [
-        { at: 0, time: '08:30', label: 'Depot checkout', detail: 'Pre-trip checklist passed' },
-        { at: 25, time: '09:45', label: 'Harsh cornering', detail: '0.38 g lateral force' },
-        { at: 40, time: '11:15', label: 'Stop', detail: 'Customer drop · 18 min dwell' },
-        { at: 75, time: '14:20', label: 'Charging stop', detail: 'Fast DC session (28% to 80%)' },
-        { at: 100, time: '17:05', label: 'Depot return', detail: 'Parked in staging yard' }
-      ],
-      '2026-10-29': [
-        { at: 0, time: '09:10', label: 'Trip started', detail: 'Depot dispatch' },
-        { at: 50, time: '12:30', label: 'Stop', detail: 'Midday warehouse staging' },
-        { at: 100, time: '16:45', label: 'Shift finished', detail: 'Driver check-in complete' }
-      ]
-    };
-  }, []);
-
-  const tripsByDay = useMemo(() => {
-    return {
-      '2026-10-31': { timeRange: '09:52–10:42', start: '09:52', end: '10:42', distance: vehicle.trip || '18.4 km', area: vehicle.location },
-      '2026-10-30': { timeRange: '08:30–17:05', start: '08:30', end: '17:05', distance: '38.6 km', area: `${vehicle.location} Industrial Zone` },
-      '2026-10-29': { timeRange: '09:10–16:45', start: '09:10', end: '16:45', distance: '31.2 km', area: `${vehicle.location} Express Ring` }
-    };
-  }, [vehicle]);
-
   // Handle day click in calendar: enforce maximum 2 days range rule
   const handleCalendarDayClick = dayKey => {
     setCalendarWarning('');
@@ -872,6 +871,35 @@ export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNear
     return keys;
   }, [startDate, endDate]);
 
+  useEffect(() => { setSelectedTrip('all'); setTripMenuOpen(false); }, [startDate, endDate, startTime, endTime]);
+  const formatMinutes = minutes => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+  const tripEventCategory = event => event.category;
+  const availableTrips = activeDateKeys.flatMap(day => Array.from({ length: 5 }, (_, index) => {
+    const startMinutes = 6 * 60 + index * 150;
+    const duration = 69;
+    const entries = [
+      ['Trip started', 'Ignition on', 'trip'], ['Vehicle moving', 'Departed from starting point', 'trip'],
+      ['Speed update', 'Speed recorded', 'trip'], ['Route update', 'Vehicle location recorded', 'trip'],
+      ['Harsh acceleration', 'Rapid acceleration detected', 'alerts'], ['Speed update', 'Speed recorded', 'trip'],
+      ['Route update', 'Vehicle location recorded', 'trip'], ['Speed update', 'Speed recorded', 'trip'],
+      ['Harsh turn', 'Sharp turn detected', 'alerts'], ['Route update', 'Vehicle location recorded', 'trip'],
+      ['Speed update', 'Speed recorded', 'trip'], ['Route update', 'Vehicle location recorded', 'trip'],
+      ['Speed limit exceeded', 'Speed threshold exceeded', 'alerts'], ['Route update', 'Vehicle location recorded', 'trip'],
+      ['Speed update', 'Speed recorded', 'trip'], ['Route update', 'Vehicle location recorded', 'trip'],
+      ['Harsh braking', 'Sudden braking detected', 'alerts'], ['Speed update', 'Speed recorded', 'trip'],
+      ['Route update', 'Vehicle location recorded', 'trip'], ['Speed update', 'Speed recorded', 'trip'],
+      ['Route update', 'Vehicle location recorded', 'trip'], ['Vehicle slowing', 'Approaching the end of the trip', 'trip'],
+      ['Vehicle stopped', 'Vehicle came to a stop', 'stops'], ['Trip ended', 'Ignition off', 'trip']
+    ];
+    return { id: `${day}#${index}`, day, index, start: formatMinutes(startMinutes), end: formatMinutes(startMinutes + duration), timeRange: `${formatMinutes(startMinutes)}–${formatMinutes(startMinutes + duration)}`, distance: (8.6 + index * 2.3 + (Number(vehicle.id.slice(3)) % 7) * 0.2), events: entries.map(([label, detail, category], position) => ({ label, detail, category, time: formatMinutes(startMinutes + position * 3), at: Math.round(position / (entries.length - 1) * 100) })) };
+  })).filter(trip => isAllDay || (trip.end >= startTime && trip.start <= endTime));
+  const selectedTripIndex = availableTrips.findIndex(trip => trip.id === selectedTrip);
+  const selectedTripRecord = availableTrips[selectedTripIndex];
+  const selectHistoryTrip = value => { setSelectedTrip(value); setProgress(0); setPlaying(false); setPlayback(true); setTripMenuOpen(false); };
+  const visibleTrips = selectedTrip === 'all' ? availableTrips : availableTrips.filter(trip => trip.id === selectedTrip);
+  const totalTripDistance = visibleTrips.reduce((total, trip) => total + trip.distance, 0);
+  const alertCount = visibleTrips.reduce((total, trip) => total + trip.events.filter(event => tripEventCategory(event) === 'alerts' && (isAllDay || (event.time >= startTime && event.time <= endTime))).length, 0);
+
   // Calendar rendering calculations
   const calendarDays = useMemo(() => {
     const y = displayMonth.getFullYear();
@@ -892,15 +920,18 @@ export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNear
 
   const monthLabel = displayMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
+  if (detailsLoading) return <aside className={`vehicle-details details-loading ${closing ? 'is-closing' : ''}`} aria-label="Loading vehicle details" aria-busy="true">{mobileSheetHandle}<span className="sr-only">Loading vehicle details</span><div className="details-skeleton" aria-hidden="true"><div className="skeleton-block details-skeleton-title"/><div className="skeleton-block details-skeleton-tabs"/><div className="skeleton-block details-skeleton-status"/><div className="skeleton-block details-skeleton-section"/><div className="skeleton-block details-skeleton-section"/><div className="skeleton-block details-skeleton-section"/></div></aside>;
+
   return (
-    <aside className={`vehicle-details ${closing ? 'is-closing' : ''}`} aria-hidden={closing || undefined} inert={closing || undefined} aria-label={`Vehicle details for ${vehicle.id}`}>
+    <aside className={`vehicle-details details-loaded ${closing ? 'is-closing' : ''}`} aria-hidden={closing || undefined} inert={closing || undefined} aria-label={`Vehicle details for ${vehicle.id}`}>
+      {mobileSheetHandle}
       {/* Header */}
       <div className="details-header">
         <div>
           <div className="details-identity-line"><h2>{vehicle.id}</h2><span className={`co-status co-status--${vehicle.status}`}>{offline ? 'tracker offline' : vehicle.status}</span></div>
           <p>{vehicle.name}</p>
         </div>
-        <button className="co-icon-button" aria-label="Close vehicle details" onClick={onClose}><X size={18}/></button>
+        <button className="co-icon-button details-back-control" aria-label="Back to vehicles" onClick={onClose}><ChevronLeft className="mobile-back-icon" size={20}/><X className="desktop-close-icon" size={18}/></button>
       </div>
 
       {/* Refined Segmented Tab Switcher at the Top Middle */}
@@ -1162,35 +1193,8 @@ export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNear
         </div>
       )}
 
-      {/* Normal Tabs: Timeline | Trips | Events */}
-      {tab === 'history' && (
-        <div className="history-normal-tabs-bar">
-          <div className="history-normal-tabs" role="tablist" aria-label="History view">
-            {['timeline', 'trips', 'events'].map(item => (
-              <button
-                key={item}
-                type="button"
-                role="tab"
-                aria-selected={view === item}
-                className={`history-normal-tab ${view === item ? 'active' : ''}`}
-                onClick={() => {
-                  setView(item);
-                  if (item === 'trips') {
-                    setPlayback(true);
-                  }
-                }}
-              >
-                {item[0].toUpperCase() + item.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {tab === 'history' && view === 'timeline' && <div className="history-filters" role="group" aria-label="Filter timeline events">{[['all', 'All'], ['trip', 'Trip'], ['stops', 'Stops'], ['alerts', 'Alerts']].map(([key, label]) => <button type="button" key={key} aria-pressed={timelineFilter === key} onClick={() => setTimelineFilter(key)}>{label}</button>)}</div>}
-
       {/* Scrollable content area */}
-      <div className="details-content" ref={detailsContentRef}>
+      <div className={`details-content ${tab === 'history' ? 'details-content--history' : ''}`} ref={detailsContentRef}>
         {tab === 'overview' ? (
           <>
             <section className="live-summary" aria-label="Current vehicle status">
@@ -1210,8 +1214,17 @@ export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNear
                 <p>Live dispatch, diagnostic and tracker data is not connected.</p>
               </div>
             )}
+            <details className="details-accordion">
+              <summary className="accordion-heading"><span className="driver-details-icon"><Activity size={16} aria-hidden="true" /></span><span className="accordion-title"><b>Vehicle telematics</b><small>Vehicle, powertrain and sensor data</small></span><ChevronDown size={16} className="accordion-chevron" /></summary>
+              <VehicleTelematics vehicle={vehicle} />
+            </details>
+            <details className="details-accordion">
+              <summary className="accordion-heading"><span className="driver-details-icon"><AlertTriangle size={16} aria-hidden="true" /></span><span className="accordion-title"><b>DTCs & fault codes</b><small>Diagnostic trouble codes and fault history</small></span><ChevronDown size={16} className="accordion-chevron" /></summary>
+              <VehicleFaults vehicle={vehicle} />
+            </details>
             <details className="driver-details details-accordion">
               <summary className="accordion-heading"><span className="driver-details-icon"><UserRound size={16} aria-hidden="true" /></span><span className="accordion-title"><b>Driver details</b><small>{vehicle.driver || 'Driver unavailable'} · {offline ? 'Last assigned' : vehicle.status === 'idle' || vehicle.status === 'stopped' ? 'Last driven by' : 'Assigned driver'}</small></span><ChevronDown size={16} className="accordion-chevron" /></summary>
+              {vehicle.driverDetailsGenerated && <p className="driver-generated-note">Generated driver details</p>}
               <div className="driver-details-grid">
                 <div><span>Full name</span><b>{vehicle.driver || 'Not available'}</b></div>
                 <div><span>Driver ID</span><b>{vehicle.driverId || 'Not available'}</b></div>
@@ -1220,6 +1233,10 @@ export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNear
                 <div><span>Email address</span><b>{vehicle.driverEmail || 'Not available'}</b></div>
               </div>
               <div className="driver-details-scores" aria-label="Driver scores"><div><span>Driving score</span><b>{vehicle.driverScore ?? (75 + (Number(vehicle.id.slice(3)) % 25))}<small> / 100</small></b></div><div><span>Fuel score</span><b>{vehicle.fuelScore ?? (70 + (Number(vehicle.id.slice(3)) * 7 % 30))}<small> / 100</small></b></div></div>
+            </details>
+            <details className="details-accordion">
+              <summary className="accordion-heading"><span className="driver-details-icon"><Clock size={16} aria-hidden="true" /></span><span className="accordion-title"><b>ELD & duty logs</b><small>Driver duty records and hours</small></span><ChevronDown size={16} className="accordion-chevron" /></summary>
+              <DriverELD vehicle={vehicle} />
             </details>
             <details className="details-accordion" onToggle={event => setMediaOpen(event.currentTarget.open)}>
               <summary className="accordion-heading"><span className="driver-details-icon"><Video size={16} aria-hidden="true" /></span><span className="accordion-title"><b>Media</b><small>Dashcam video and snapshots</small></span><ChevronDown size={16} className="accordion-chevron" /></summary>
@@ -1243,41 +1260,32 @@ export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNear
           </section>
         ) : (
           <>
-            {/* Iterating across the selected 1 or 2 days */}
-            {activeDateKeys.map(dayKey => {
-              const dayEvents = eventsByDay[dayKey] || eventsByDay['2026-10-31'];
-              const dayTrip = tripsByDay[dayKey] || tripsByDay['2026-10-31'];
-
-              // Filter events by selected sub-view (timeline vs events) AND by time window
-              const filteredEvents = dayEvents.filter(e => {
-                const matchesView = view !== 'events' || e.isIncident || e.at === 12 || e.at === 38 || e.at === 52 || e.at === 65 || e.at === 78;
+            <div className="history-trip-selector"><div className="trip-dropdown" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setTripMenuOpen(false); }} onKeyDown={event => { if (event.key === 'Escape') { setTripMenuOpen(false); event.currentTarget.querySelector('.trip-dropdown-trigger')?.focus(); } }}><button type="button" className="trip-dropdown-trigger" aria-label="Select trips" aria-expanded={tripMenuOpen} aria-controls="history-trip-options" onClick={() => setTripMenuOpen(open => !open)}><span>{selectedTrip === 'all' ? 'All trips' : selectedTripRecord ? `${formatDayLabel(selectedTripRecord.day)} · ${selectedTripRecord.timeRange}` : 'All trips'}</span><ChevronDown size={15} /></button>{tripMenuOpen && <div id="history-trip-options" className="trip-dropdown-options" role="group" aria-label="Choose trips">{[['all', 'All trips'], ...availableTrips.map(trip => [trip.id, `${formatDayLabel(trip.day)} · ${trip.timeRange}`])].map(([value, label]) => <button type="button" key={value} aria-pressed={selectedTrip === value} onClick={() => selectHistoryTrip(value)}><span>{label}</span>{selectedTrip === value && <Check size={15} aria-hidden="true" />}</button>)}</div>}</div><div className="trip-navigation" aria-label="Navigate trips"><button type="button" aria-label="Previous trip" title="Previous trip" disabled={!availableTrips.length || (selectedTrip !== 'all' && selectedTripIndex >= availableTrips.length - 1)} onClick={() => selectHistoryTrip(availableTrips[selectedTrip === 'all' ? 0 : selectedTripIndex + 1].id)}><ChevronLeft size={16} /></button><button type="button" aria-label="Next trip" title="Next trip" disabled={!availableTrips.length || (selectedTrip !== 'all' && selectedTripIndex <= 0)} onClick={() => selectHistoryTrip(availableTrips[selectedTrip === 'all' ? availableTrips.length - 1 : selectedTripIndex - 1].id)}><ChevronRight size={16} /></button></div></div>
+            <details className="history-trip-summary"><summary><span>Trip summary</span><ChevronDown size={16} aria-hidden="true" /></summary>{visibleTrips.length ? <div className="history-summary-grid"><div><span>Trips</span><b>{visibleTrips.length}</b></div><div><span>Distance</span><b>{totalTripDistance.toFixed(1)} km</b></div><div><span>Alerts</span><b>{alertCount}</b></div></div> : <p>No trips in this date and time range.</p>}{!isAllDay && visibleTrips.length > 0 && <p>Distance covers the full selected trips.</p>}</details>
+            <div className="history-timeline-controls"><div className="history-timeline-heading"><h3>Timeline</h3><div className={`timeline-search ${timelineSearchOpen ? 'is-open' : ''}`} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget) && !timelineSearch.trim()) setTimelineSearchOpen(false); }} onKeyDown={event => { if (event.key === 'Escape') { if (timelineSearch) setTimelineSearch(''); else { setTimelineSearchOpen(false); event.currentTarget.querySelector('button')?.focus(); } } }}><button type="button" className="timeline-search-toggle" aria-label="Search timeline" aria-expanded={timelineSearchOpen} onClick={() => { if (!timelineSearchOpen) setTimelineSearchOpen(true); else if (!timelineSearch.trim()) setTimelineSearchOpen(false); else timelineSearchRef.current?.focus(); }}><Search size={15} aria-hidden="true" /></button><input ref={timelineSearchRef} type="search" aria-label="Search timeline" placeholder="Search timeline" value={timelineSearch} disabled={!timelineSearchOpen} onChange={event => setTimelineSearch(event.target.value)} /></div></div>
+            <div className="history-filters" role="group" aria-label="Filter timeline events">{[['all', 'All'], ['trip', 'Trip'], ['stops', 'Stops'], ['alerts', 'Alerts']].map(([key, label]) => <button type="button" key={key} aria-pressed={timelineFilter === key} onClick={() => setTimelineFilter(key)}>{label}</button>)}</div></div>
+            {visibleTrips.map(trip => {
+              const filteredEvents = trip.events.filter(e => {
                 const inTimeWindow = isAllDay || (e.time >= startTime && e.time <= endTime);
-                const category = e.label === 'Stop' ? 'stops' : e.isIncident ? 'alerts' : 'trip';
-                const matchesFilter = view !== 'timeline' || timelineFilter === 'all' || timelineFilter === category;
-                return matchesView && inTimeWindow && matchesFilter;
+                const matchesSearch = !timelineSearch.trim() || [e.label, e.detail, e.time].some(value => value.toLowerCase().includes(timelineSearch.trim().toLowerCase()));
+                return inTimeWindow && matchesSearch && (timelineFilter === 'all' || timelineFilter === tripEventCategory(e));
               });
 
               return (
-                <div key={dayKey} className="history-day-group">
+                <div key={trip.id} className="history-day-group">
                   <div className="history-day-header">
-                    <span>{formatDayLabel(dayKey)}</span>
+                    <span>{formatDayLabel(trip.day)} · {trip.timeRange}</span>
                     <span className="history-day-sub">
                       {isAllDay ? 'All Day · IST' : `${startTime}–${endTime} IST`}
                     </span>
                   </div>
 
-                  {view === 'trips' ? (
-                    <div className="history-trip">
-                      <b>{dayTrip.timeRange} IST · Trip</b>
-                      <p>{dayTrip.distance} · {dayTrip.area}</p>
-                      <button className="co-button" onClick={openPlayback}>Replay trip</button>
-                    </div>
-                  ) : filteredEvents.length > 0 ? (
+                  {filteredEvents.length > 0 ? (
                     <div className="history-events">
                       {filteredEvents.map(event => (
                         <button
-                          key={`${dayKey}-${event.at}`}
-                          onClick={() => { setPlayback(true); setPlaying(false); setProgress(event.at); }}
+                          key={`${trip.id}-${event.at}`}
+                          onClick={() => { setSelectedTrip(trip.id); setPlayback(true); setPlaying(false); setProgress(event.at); }}
                         >
                           <b>{event.time} IST · {event.label}</b>
                           <span>{event.detail} · Select to view on map</span>
@@ -1286,8 +1294,8 @@ export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNear
                     </div>
                   ) : (
                     <div className="history-empty-window">
-                      <span>{view === 'timeline' && timelineFilter !== 'all' ? 'No matching activity for this filter and time range.' : `No events found between ${startTime} and ${endTime} IST`}</span>
-                      {view === 'timeline' && timelineFilter !== 'all' ? <button type="button" className="reset-time-link" onClick={() => setTimelineFilter('all')}>Show all activity</button> : !isAllDay && <button type="button" className="reset-time-link" onClick={() => setTimePreset('00:00', '23:59')}>Reset to All Day</button>}
+                      <span>{timelineFilter !== 'all' || timelineSearch.trim() ? 'No matching activity for this search and filter.' : `No events found between ${startTime} and ${endTime} IST`}</span>
+                      {timelineFilter !== 'all' || timelineSearch.trim() ? <button type="button" className="reset-time-link" onClick={() => { setTimelineFilter('all'); setTimelineSearch(''); }}>Show all activity</button> : !isAllDay && <button type="button" className="reset-time-link" onClick={() => setTimePreset('00:00', '23:59')}>Reset to All Day</button>}
                     </div>
                   )}
                 </div>
@@ -1523,40 +1531,14 @@ export default function VehicleDetails({ vehicle, fleetVehicles = [], renderNear
                       />
                     )}
 
-                    {/* Incident Pins along the timeline */}
-                    {telemetryData.incidents.map(inc => {
-                      const cx = inc.progress * 10;
-                      let cy = 126;
-                      if (telemetryMetric === 'speed') cy = speedToY(inc.speed);
-                      else if (telemetryMetric === 'gforce') cy = gForceToY(inc.gForce);
-                      else if (telemetryMetric === 'accel') cy = accelToY(inc.accel);
-                      else cy = speedToY(inc.speed);
-
-                      const isCurrent = Math.abs(progress - inc.progress) <= 2;
-                      return (
-                        <g key={inc.progress} className="incident-svg-pin">
-                          {isCurrent && (
-                            <circle
-                              cx={cx}
-                              cy={cy}
-                              r="9"
-                              fill={inc.event.severity === 'alert' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(243, 108, 45, 0.25)'}
-                              stroke={inc.event.severity === 'alert' ? '#ef4444' : '#f36c2d'}
-                              strokeWidth="1"
-                            />
-                          )}
-                          <circle
-                            cx={cx}
-                            cy={cy}
-                            r="4.5"
-                            fill="#fff"
-                            stroke={inc.event.severity === 'alert' ? '#ef4444' : '#f36c2d'}
-                            strokeWidth="2.5"
-                          />
-                        </g>
-                      );
-                    })}
                   </svg>
+
+                  {/* Fixed-size points remain circular as the graph resizes. */}
+                  {telemetryData.incidents.map(inc => {
+                    const y = telemetryMetric === 'gforce' ? gForceToY(inc.gForce) : telemetryMetric === 'accel' ? accelToY(inc.accel) : speedToY(inc.speed);
+                    const isCurrent = Math.abs(progress - inc.progress) <= 2;
+                    return <span key={inc.progress} aria-hidden="true" className={`telemetry-event-point ${inc.event.severity === 'alert' ? 'is-alert' : ''} ${isCurrent ? 'is-current' : ''}`} style={{ left: `${inc.progress}%`, top: `${y / 140 * 100}%` }} />;
+                  })}
 
                   {/* Hover Guide Needle */}
                   {hoverProgress !== null && hoverProgress !== progress && (
